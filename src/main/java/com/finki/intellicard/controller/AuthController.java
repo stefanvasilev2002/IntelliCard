@@ -11,7 +11,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import javax.validation.Valid;
 
 @RestController
 @RequestMapping("/api/v1/auth")
@@ -31,7 +30,7 @@ public class AuthController {
     @Operation(summary = "User login",
             description = "Authenticate a user and return a JWT token")
     @PostMapping("/login")
-    public ResponseEntity<String> login(@Valid @RequestBody LoginRequestRecord loginRequest) {
+    public ResponseEntity<String> login(@RequestBody LoginRequestRecord loginRequest) {
         try {
             String token = loginService.verify(loginRequest);
             return ResponseEntity.ok(token);
@@ -43,7 +42,7 @@ public class AuthController {
     @Operation(summary = "User registration",
             description = "Register a new user in the system")
     @PostMapping("/register")
-    public ResponseEntity<String> register(@Valid @RequestBody RegisterRequestRecord registerRequest) {
+    public ResponseEntity<String> register(@RequestBody RegisterRequestRecord registerRequest) {
         try {
             if (userService.existsByUsername(registerRequest.username())) {
                 return ResponseEntity.status(HttpStatus.CONFLICT).body("Username already exists");
