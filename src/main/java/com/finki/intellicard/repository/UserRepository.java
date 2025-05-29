@@ -19,4 +19,5 @@ public interface UserRepository extends JpaRepository<User, Long> {
     @Query("SELECT new com.finki.intellicard.record.UserRecord(u.id, u.fullName, u.username) " +
             "FROM Users u WHERE u.username = :username")
     Optional<UserRecord> findUserRecordByUsername(@Param("username") String username);
+    boolean existsByEmail(String email);
 }
