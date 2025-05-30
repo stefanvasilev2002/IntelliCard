@@ -3,6 +3,7 @@ package com.finki.intellicard.repository;
 import com.finki.intellicard.model.AccessRequest;
 import com.finki.intellicard.model.enums.AccessRequestStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -19,7 +20,11 @@ public interface AccessRequestRepository extends JpaRepository<AccessRequest, Lo
 
     List<AccessRequest> findByRequesterId(Long requesterId);
 
-    void deleteByRequesterId(Long requesterId);
+    @Modifying
+    @Query("DELETE FROM AccessRequest ar WHERE ar.requester.id = :userId")
+    void deleteByRequesterId(@Param("userId") Long userId);
 
-    void deleteByCardSetId(Long cardSetId);
+    @Modifying
+    @Query("DELETE FROM AccessRequest ar WHERE ar.cardSet.id = :cardSetId")
+    void deleteByCardSetId(@Param("cardSetId") Long cardSetId);
 }

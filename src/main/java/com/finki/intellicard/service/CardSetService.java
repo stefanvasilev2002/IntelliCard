@@ -1,5 +1,8 @@
 package com.finki.intellicard.service;
 
+import com.finki.intellicard.exceptions.CardSetNotFoundException;
+import com.finki.intellicard.exceptions.UnauthorizedAccessException;
+import com.finki.intellicard.exceptions.UserNotFoundException;
 import com.finki.intellicard.model.CardSet;
 import com.finki.intellicard.model.User;
 import com.finki.intellicard.record.CardSetRecord;
@@ -36,19 +39,28 @@ public class CardSetService {
     }
 
     public CardSetRecord getCardSetById(Long cardSetId) {
+        CardSet cardSet = cardSetRepository.findById(cardSetId)
+                .orElseThrow(() -> new CardSetNotFoundException("CardSet not found"));
+
+        verifyCardSetAccess(cardSet);
+
         String username = myUserDetailsService.getUsername();
         Long currentUserId = myUserDetailsService.getUserIdByUsername(username);
 
-        return cardSetRepository.findPublicAndAccessibleCardset(cardSetId, currentUserId)
-                .orElseThrow(() -> new RuntimeException("CardSet not found or access denied"));
+        String accessType = determineAccessType(cardSet, currentUserId);
+
+        return convertCardSetToRecord(cardSet, accessType);
     }
 
     public CardSetRecord createCardSet(CardSetRecord cardSetRecord) {
         UserRecord creatorRecord = userRepository.findUserRecordByUsername(myUserDetailsService.getUsername())
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new UserNotFoundException("User not found"));
 
-        User creator = new User();
-        creator.setId(creatorRecord.id());
+        User creator = User.builder()
+                .id(creatorRecord.id())
+                .username(creatorRecord.username())
+                .fullName(creatorRecord.fullName())
+                .build();
 
         CardSet cardSet = CardSet.builder()
                 .name(cardSetRecord.name())
@@ -58,27 +70,63 @@ public class CardSetService {
                 .lastModified(LocalDateTime.now())
                 .build();
 
-        return convertCardSetToRecord(cardSetRepository.save(cardSet), null);
+        CardSet savedCardSet = cardSetRepository.save(cardSet);
+        return convertCardSetToRecord(savedCardSet, "OWNER");
     }
 
     public void deleteCardSet(Long id) {
-        CardSet cardSet = findCardSetByIdAndVerifyOwner(id);
+        CardSet cardSet = cardSetRepository.findById(id)
+                .orElseThrow(() -> new CardSetNotFoundException("CardSet not found"));
+
+        verifyCardSetOwnership(cardSet);
+
         cardSetRepository.delete(cardSet);
     }
 
     public CardSetRecord updateCardSet(Long id, CardSetRecord cardSetRecord) {
-        CardSet cardSet = findCardSetByIdAndVerifyOwner(id);
+        CardSet cardSet = cardSetRepository.findById(id)
+                .orElseThrow(() -> new CardSetNotFoundException("CardSet not found"));
+
+        verifyCardSetOwnership(cardSet);
 
         cardSet.setName(cardSetRecord.name());
         cardSet.setPublic(cardSetRecord.isPublic());
         cardSet.setLastModified(LocalDateTime.now());
 
-        return convertCardSetToRecord(cardSetRepository.save(cardSet), cardSetRecord.accessType());
+        CardSet updatedCardSet = cardSetRepository.save(cardSet);
+        return convertCardSetToRecord(updatedCardSet, "OWNER");
     }
 
-    public CardSet findCardSetByIdAndVerifyOwner(Long id) {
-        return cardSetRepository.findByIdAndOwnerUsername(id, myUserDetailsService.getUsername())
-                .orElseThrow(() -> new RuntimeException("Access denied or Card Set not found"));
+    private void verifyCardSetOwnership(CardSet cardSet) {
+        String currentUsername = myUserDetailsService.getUsername();
+        if (!cardSet.getCreator().getUsername().equals(currentUsername)) {
+            throw new UnauthorizedAccessException("You are not authorized to perform this action on this card set");
+        }
+    }
+
+    private void verifyCardSetAccess(CardSet cardSet) {
+        String currentUsername = myUserDetailsService.getUsername();
+        Long currentUserId = myUserDetailsService.getUserIdByUsername(currentUsername);
+
+        boolean hasAccess = cardSet.getCreator().getId().equals(currentUserId) ||
+                cardSet.isPublic() ||
+                cardSet.getApprovedUsers().stream().anyMatch(user -> user.getId().equals(currentUserId));
+
+        if (!hasAccess) {
+            throw new UnauthorizedAccessException("You are not authorized to access this card set");
+        }
+    }
+
+    private String determineAccessType(CardSet cardSet, Long currentUserId) {
+        if (cardSet.getCreator().getId().equals(currentUserId)) {
+            return "OWNER";
+        } else if (cardSet.getApprovedUsers().stream().anyMatch(user -> user.getId().equals(currentUserId))) {
+            return "ACCESSIBLE";
+        } else if (cardSet.isPublic()) {
+            return "PUBLIC";
+        } else {
+            return "NO_ACCESS";
+        }
     }
 
     private CardSetRecord convertCardSetToRecord(CardSet cardSet, String accessType) {

@@ -1,5 +1,9 @@
 package com.finki.intellicard.service;
 
+import com.finki.intellicard.exceptions.CardNotFoundException;
+import com.finki.intellicard.exceptions.CardSetNotFoundException;
+import com.finki.intellicard.exceptions.UnauthorizedAccessException;
+import com.finki.intellicard.exceptions.UserNotFoundException;
 import jakarta.transaction.Transactional;
 import com.finki.intellicard.model.AccessRequest;
 import com.finki.intellicard.model.CardSet;
@@ -40,13 +44,13 @@ public class AccessRequestService {
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
 
         UserRecord requester = userRepository.findUserRecordByUsername(username)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new UserNotFoundException("User not found"));
 
         User user = new User();
         user.setId(requester.id());
 
         CardSet cardSet = cardSetRepository.findById(cardSetId)
-                .orElseThrow(() -> new RuntimeException("Card set not found"));
+                .orElseThrow(() -> new CardSetNotFoundException("Card set not found"));
 
         if (cardSet.getCreator().getId().equals(requester.id())) {
             return new Response("message", "You are the creator of this card set.");
@@ -82,17 +86,17 @@ public class AccessRequestService {
     @Transactional
     public Response respondToRequest(Long cardSetId, Long requestId, boolean approve) {
         AccessRequest request = accessRequestRepository.findById(requestId)
-                .orElseThrow(() -> new RuntimeException("Access request not found"));
+                .orElseThrow(() -> new UnauthorizedAccessException("Access request not found"));
 
         if (!request.getCardSet().getId().equals(cardSetId)) {
-            throw new RuntimeException("Invalid cardSetId for the given request");
+            throw new CardSetNotFoundException("Invalid cardSetId for the given request");
         }
 
         String username = myUserDetailsService.getUsername();
         Long requesterId = myUserDetailsService.getUserIdByUsername(username);
 
         if (!request.getCardSet().getCreator().getId().equals(requesterId)) {
-            throw new RuntimeException("You are not authorized to respond to this request");
+            throw new UnauthorizedAccessException("You are not authorized to respond to this request");
         }
 
         if (approve) {
@@ -109,11 +113,11 @@ public class AccessRequestService {
 
     public List<AccessRequestRecord> getPendingRequests(Long cardsetId) {
         String creatorUsername = cardSetRepository.findOwnerUsernameByCardSetId(cardsetId)
-                .orElseThrow(() -> new RuntimeException("Card Set not found"));
+                .orElseThrow(() -> new CardNotFoundException("Card Set not found"));
 
         String username = myUserDetailsService.getUsername();
         if (!creatorUsername.equals(username)) {
-            throw new RuntimeException("You are not authorized to view these requests");
+            throw new UnauthorizedAccessException("You are not authorized to view these requests");
         }
 
         return accessRequestRepository.findByCardSetIdAndStatus(cardsetId, AccessRequestStatus.PENDING)

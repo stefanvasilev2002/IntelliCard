@@ -45,6 +45,9 @@ public class Card {
 
     private LocalDateTime nextReviewDate;
 
+    @Column(columnDefinition = "integer default 1")
+    private Integer interval;
+
     @Enumerated(EnumType.STRING)
     @Column(columnDefinition = "varchar(10) default 'NEW'")
     private CardStatus status = CardStatus.NEW;
