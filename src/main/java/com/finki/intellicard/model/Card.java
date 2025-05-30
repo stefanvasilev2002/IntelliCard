@@ -11,7 +11,6 @@ import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 
-
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
@@ -29,27 +28,27 @@ public class Card {
     @NotBlank
     private String definition;
 
-    @Column(columnDefinition = "integer default 0")
-    private Integer timesReviewed;
+    @Builder.Default
+    private Integer timesReviewed = 0;
 
-    @Column(columnDefinition = "integer default 0")
-    private Integer timesCorrect;
+    @Builder.Default
+    private Integer timesCorrect = 0;
 
-    @Column(columnDefinition = "integer default 0")
-    private Integer consecutiveCorrect;
+    @Builder.Default
+    private Integer consecutiveCorrect = 0;
 
-    @Column(columnDefinition = "double default 2.5")
-    private Double easeFactor;
+    @Builder.Default
+    private Double easeFactor = 2.5;
 
     private LocalDateTime lastReviewed;
 
     private LocalDateTime nextReviewDate;
 
-    @Column(columnDefinition = "integer default 1")
-    private Integer interval;
+    @Builder.Default
+    private Integer interval = 1;
 
     @Enumerated(EnumType.STRING)
-    @Column(columnDefinition = "varchar(10) default 'NEW'")
+    @Builder.Default
     private CardStatus status = CardStatus.NEW;
 
     @ManyToOne(fetch = FetchType.LAZY)

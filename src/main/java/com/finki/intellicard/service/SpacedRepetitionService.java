@@ -1,7 +1,6 @@
 package com.finki.intellicard.service;
 
 import com.finki.intellicard.exceptions.CardNotFoundException;
-import com.finki.intellicard.exceptions.CardSetAlreadyExistsException;
 import com.finki.intellicard.exceptions.CardSetNotFoundException;
 import com.finki.intellicard.exceptions.UnauthorizedAccessException;
 import com.finki.intellicard.model.Card;
