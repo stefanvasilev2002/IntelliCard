@@ -14,7 +14,8 @@ import {
     Users,
     Globe,
     Lock,
-    MoreHorizontal
+    MoreHorizontal,
+    Settings
 } from 'lucide-react';
 import DashboardLayout from '../components/DashboardLayout';
 import LoadingSpinner from '../components/LoadingSpinner';
@@ -28,6 +29,8 @@ const CardSetPage = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [cardToDelete, setCardToDelete] = useState(null);
+    const [showEditModal, setShowEditModal] = useState(false);
+    const [editingCard, setEditingCard] = useState({ term: '', definition: '' });
 
     const { data: cardSet, isLoading: cardSetLoading, error: cardSetError } = useQuery({
         queryKey: ['cardSet', id],
@@ -55,6 +58,7 @@ const CardSetPage = () => {
         enabled: !!id,
     });
 
+    // Delete card mutation
     const deleteCardMutation = useMutation({
         mutationFn: async (cardId) => {
             await cardsAPI.delete(cardId);
@@ -68,6 +72,22 @@ const CardSetPage = () => {
         },
         onError: () => {
             toast.error('Failed to delete card');
+        },
+    });
+
+    // Update card mutation
+    const updateCardMutation = useMutation({
+        mutationFn: async ({ cardId, cardData }) => {
+            const response = await cardsAPI.update(cardId, cardData);
+            return response.data;
+        },
+        onSuccess: () => {
+            toast.success('Card updated successfully');
+            queryClient.invalidateQueries(['cards', id]);
+            setShowEditModal(false);
+        },
+        onError: () => {
+            toast.error('Failed to update card');
         },
     });
 
@@ -85,6 +105,30 @@ const CardSetPage = () => {
         if (cardToDelete) {
             deleteCardMutation.mutate(cardToDelete.id);
         }
+    };
+
+    const handleEditCard = (card) => {
+        setEditingCard({
+            id: card.id,
+            term: card.term,
+            definition: card.definition
+        });
+        setShowEditModal(true);
+    };
+
+    const handleUpdateCard = () => {
+        if (!editingCard.term.trim() || !editingCard.definition.trim()) {
+            toast.error('Both term and definition are required');
+            return;
+        }
+
+        updateCardMutation.mutate({
+            cardId: editingCard.id,
+            cardData: {
+                term: editingCard.term,
+                definition: editingCard.definition
+            }
+        });
     };
 
     const getAccessIcon = (accessType) => {
@@ -157,13 +201,29 @@ const CardSetPage = () => {
 
                     <div className="flex items-center space-x-3">
                         {isOwner && (
-                            <Link
-                                to={`/cardset/${id}/edit`}
-                                className="btn-secondary flex items-center space-x-2"
-                            >
-                                <Edit size={16} />
-                                <span>Edit Set</span>
-                            </Link>
+                            <div className="relative group">
+                                <button className="btn-secondary flex items-center space-x-2">
+                                    <Settings size={16} />
+                                    <span>Manage</span>
+                                    <MoreHorizontal size={16} />
+                                </button>
+                                <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10">
+                                    <Link
+                                        to={`/cardset/${id}/edit`}
+                                        className="flex items-center space-x-2 w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-50 rounded-t-lg"
+                                    >
+                                        <Edit size={14} />
+                                        <span>Edit Card Set</span>
+                                    </Link>
+                                    <Link
+                                        to={`/cardset/${id}/add-card`}
+                                        className="flex items-center space-x-2 w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-50 rounded-b-lg"
+                                    >
+                                        <Plus size={14} />
+                                        <span>Add New Card</span>
+                                    </Link>
+                                </div>
+                            </div>
                         )}
 
                         {canStudy && (
@@ -188,7 +248,7 @@ const CardSetPage = () => {
                             <div className="ml-4">
                                 <p className="text-sm font-medium text-gray-600">Total Cards</p>
                                 <p className="text-2xl font-bold text-gray-900">
-                                    {studyOverview?.totalCards || 0}
+                                    {studyOverview?.totalCards || cards?.length || 0}
                                 </p>
                             </div>
                         </div>
@@ -237,10 +297,41 @@ const CardSetPage = () => {
                     </div>
                 </div>
 
+                {/* Quick Actions for Owners */}
+                {isOwner && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+                        <Link
+                            to={`/cardset/${id}/add-card`}
+                            className="card-hover flex items-center space-x-4 p-4"
+                        >
+                            <div className="p-3 bg-blue-100 rounded-lg">
+                                <Plus className="w-6 h-6 text-blue-600" />
+                            </div>
+                            <div>
+                                <h3 className="font-semibold text-gray-900">Add New Card</h3>
+                                <p className="text-sm text-gray-500">Create a new flashcard</p>
+                            </div>
+                        </Link>
+
+                        <Link
+                            to={`/cardset/${id}/edit`}
+                            className="card-hover flex items-center space-x-4 p-4"
+                        >
+                            <div className="p-3 bg-green-100 rounded-lg">
+                                <Settings className="w-6 h-6 text-green-600" />
+                            </div>
+                            <div>
+                                <h3 className="font-semibold text-gray-900">Edit Card Set</h3>
+                                <p className="text-sm text-gray-500">Manage cards and settings</p>
+                            </div>
+                        </Link>
+                    </div>
+                )}
+
                 {/* Cards Section */}
                 <div className="card">
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
-                        <h2 className="text-xl font-semibold text-gray-900">Cards</h2>
+                        <h2 className="text-xl font-semibold text-gray-900">All Cards</h2>
                         <div className="flex items-center space-x-4 mt-4 sm:mt-0">
                             <div className="relative">
                                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
@@ -316,14 +407,16 @@ const CardSetPage = () => {
                                         {isOwner && (
                                             <div className="ml-4 flex items-center space-x-2">
                                                 <button
-                                                    onClick={() => navigate(`/cardset/${id}/card/${card.id}/edit`)}
+                                                    onClick={() => handleEditCard(card)}
                                                     className="p-2 text-gray-400 hover:text-blue-600 transition-colors"
+                                                    title="Edit card"
                                                 >
                                                     <Edit size={16} />
                                                 </button>
                                                 <button
                                                     onClick={() => handleDeleteCard(card)}
                                                     className="p-2 text-gray-400 hover:text-red-600 transition-colors"
+                                                    title="Delete card"
                                                 >
                                                     <Trash2 size={16} />
                                                 </button>
@@ -331,9 +424,9 @@ const CardSetPage = () => {
                                         )}
                                     </div>
 
-                                    {card.status && (
+                                    {(card.status || card.timesReviewed) && (
                                         <div className="mt-3 flex items-center justify-between text-sm text-gray-500">
-                                            <span>Status: {card.status}</span>
+                                            <span>Status: {card.status || 'NEW'}</span>
                                             <span>Reviewed: {card.timesReviewed || 0} times</span>
                                         </div>
                                     )}
@@ -342,6 +435,60 @@ const CardSetPage = () => {
                         </div>
                     )}
                 </div>
+
+                {/* Edit Card Modal */}
+                {showEditModal && (
+                    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
+                        <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+                            <h3 className="text-lg font-medium text-gray-900 mb-4">Edit Card</h3>
+
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Term
+                                    </label>
+                                    <textarea
+                                        value={editingCard.term}
+                                        onChange={(e) => setEditingCard({ ...editingCard, term: e.target.value })}
+                                        className="input resize-none"
+                                        rows={2}
+                                        placeholder="Front of the card"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Definition
+                                    </label>
+                                    <textarea
+                                        value={editingCard.definition}
+                                        onChange={(e) => setEditingCard({ ...editingCard, definition: e.target.value })}
+                                        className="input resize-none"
+                                        rows={3}
+                                        placeholder="Back of the card"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="flex justify-end space-x-3 mt-6">
+                                <button
+                                    onClick={() => setShowEditModal(false)}
+                                    className="btn-secondary"
+                                    disabled={updateCardMutation.isPending}
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={handleUpdateCard}
+                                    className="btn-primary"
+                                    disabled={updateCardMutation.isPending}
+                                >
+                                    {updateCardMutation.isPending ? 'Saving...' : 'Save Changes'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 {/* Delete Confirmation Modal */}
                 {showDeleteModal && (

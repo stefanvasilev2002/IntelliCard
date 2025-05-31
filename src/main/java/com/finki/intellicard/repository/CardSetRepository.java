@@ -18,17 +18,14 @@ public interface CardSetRepository extends JpaRepository<CardSet, Long> {
             "CASE " +
             "   WHEN c.creator.id = :currentUserId THEN 'OWNER' " +
             "   WHEN :currentUserId IN (SELECT u.id FROM c.approvedUsers u) THEN 'ACCESSIBLE' " +
+            "   WHEN c.isPublic = true THEN 'PUBLIC' " +
             "   WHEN EXISTS (SELECT 1 FROM AccessRequest ar WHERE ar.cardSet.id = c.id " +
             "                AND ar.requester.id = :currentUserId AND ar.status = 'PENDING') THEN 'PENDING' " +
             "   WHEN EXISTS (SELECT 1 FROM AccessRequest ar WHERE ar.cardSet.id = c.id " +
             "                AND ar.requester.id = :currentUserId AND ar.status = 'REJECTED') THEN 'REJECTED' " +
-            "   ELSE 'PUBLIC' " +
+            "   ELSE 'PRIVATE' " +
             "END) " +
-            "FROM CardSet c " +
-            "WHERE c.creator.id = :currentUserId " +
-            "OR c.isPublic = true " +
-            "OR :currentUserId IN (SELECT u.id FROM c.approvedUsers u) " +
-            "OR EXISTS (SELECT 1 FROM AccessRequest ar WHERE ar.cardSet.id = c.id AND ar.requester.id = :currentUserId)")
+            "FROM CardSet c")
     List<CardSetRecord> findAllPublicAndAccessibleCardsets(@Param("currentUserId") Long currentUserId);
 
     @Query("SELECT c FROM CardSet c WHERE c.id = :setId AND c.creator.username = :username")

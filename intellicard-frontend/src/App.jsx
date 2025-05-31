@@ -11,7 +11,8 @@ import DashboardPage from './pages/DashboardPage';
 import CardSetPage from './pages/CardSetPage';
 import StudyPage from './pages/StudyPage';
 import CreateCardSetPage from './pages/CreateCardSetPage';
-//import EditCardSetPage from './pages/EditCardSetPage';
+import EditCardSetPage from './pages/EditCardSetPage.jsx';
+import AddCardPage from './pages/AddCardPage';
 
 // Components
 import LoadingSpinner from './components/LoadingSpinner';
@@ -26,6 +27,7 @@ const queryClient = new QueryClient({
     },
 });
 
+// Protected Route Component
 const ProtectedRoute = ({ children }) => {
     const { isAuthenticated, loading } = useAuth();
 
@@ -40,6 +42,7 @@ const ProtectedRoute = ({ children }) => {
     return children;
 };
 
+// Public Route Component (redirect if already authenticated)
 const PublicRoute = ({ children }) => {
     const { isAuthenticated, loading } = useAuth();
 
@@ -109,14 +112,22 @@ const AppRoutes = () => {
                     </ProtectedRoute>
                 }
             />
-            {/*<Route
+            <Route
                 path="/cardset/:id/edit"
                 element={
                     <ProtectedRoute>
                         <EditCardSetPage />
                     </ProtectedRoute>
                 }
-            />*/}
+            />
+            <Route
+                path="/cardset/:id/add-card"
+                element={
+                    <ProtectedRoute>
+                        <AddCardPage />
+                    </ProtectedRoute>
+                }
+            />
 
             {/* Default redirect */}
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
