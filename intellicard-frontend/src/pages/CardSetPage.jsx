@@ -451,9 +451,16 @@ const CardSetPage = () => {
                                         value={editingCard.term}
                                         onChange={(e) => setEditingCard({ ...editingCard, term: e.target.value })}
                                         className="input resize-none"
+                                        maxLength={255}
                                         rows={2}
                                         placeholder="Front of the card"
                                     />
+                                    <p className={`text-xs mt-1 ${
+                                        editingCard.term.length > 230 ? 'text-red-600' :
+                                            editingCard.term.length > 200 ? 'text-orange-600' : 'text-gray-400'
+                                    }`}>
+                                        {editingCard.term.length}/255
+                                    </p>
                                 </div>
 
                                 <div>
@@ -464,9 +471,16 @@ const CardSetPage = () => {
                                         value={editingCard.definition}
                                         onChange={(e) => setEditingCard({ ...editingCard, definition: e.target.value })}
                                         className="input resize-none"
+                                        maxLength={255}
                                         rows={3}
                                         placeholder="Back of the card"
                                     />
+                                    <p className={`text-xs mt-1 ${
+                                        editingCard.definition.length > 230 ? 'text-red-600' :
+                                            editingCard.definition.length > 200 ? 'text-orange-600' : 'text-gray-400'
+                                    }`}>
+                                        {editingCard.definition.length}/255
+                                    </p>
                                 </div>
                             </div>
 

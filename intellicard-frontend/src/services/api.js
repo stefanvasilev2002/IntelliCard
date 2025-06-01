@@ -69,6 +69,8 @@ export const accessRequestsAPI = {
     getPending: (cardSetId) => api.get(`/cardsets/${cardSetId}/access-requests`),
     respond: (cardSetId, requestId, approve) =>
         api.put(`/cardsets/${cardSetId}/access-requests/${requestId}?approve=${approve}`),
+    revoke: (cardSetId) =>
+        api.delete(`/cardsets/${cardSetId}/access-requests/revoke`),
 };
 
 export default api;

@@ -370,9 +370,16 @@ const EditCardSetPage = () => {
                                                 value={card.term}
                                                 onChange={(e) => handleCardChange(index, 'term', e.target.value)}
                                                 placeholder="Enter the term or question"
+                                                maxLength={255}
                                                 className="input"
                                                 disabled={isLoading}
                                             />
+                                            <p className={`text-xs mt-1 ${
+                                                card.term.length > 230 ? 'text-red-600' :
+                                                    card.term.length > 200 ? 'text-orange-600' : 'text-gray-400'
+                                            }`}>
+                                                {card.term.length}/255
+                                            </p>
                                         </div>
 
                                         <div>
@@ -383,10 +390,17 @@ const EditCardSetPage = () => {
                                                 value={card.definition}
                                                 onChange={(e) => handleCardChange(index, 'definition', e.target.value)}
                                                 placeholder="Enter the definition or answer"
+                                                maxLength={255}
                                                 rows={3}
                                                 className="input resize-none"
                                                 disabled={isLoading}
                                             />
+                                            <p className={`text-xs mt-1 ${
+                                                card.definition.length > 230 ? 'text-red-600' :
+                                                    card.definition.length > 200 ? 'text-orange-600' : 'text-gray-400'
+                                            }`}>
+                                                {card.definition.length}/255
+                                            </p>
                                         </div>
                                     </div>
 

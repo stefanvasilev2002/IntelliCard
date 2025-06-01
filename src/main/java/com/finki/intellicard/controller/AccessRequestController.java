@@ -54,4 +54,14 @@ public class AccessRequestController {
         Response response = accessRequestService.respondToRequest(cardSetId, requestId, approve);
         return ResponseEntity.ok(response);
     }
+
+    @DeleteMapping("/revoke")
+    @Operation(summary = "Revoke my access request",
+            description = "Cancel/revoke the current user's pending access request")
+    public ResponseEntity<Response> revokeMyRequest(
+            @Parameter(description = "ID of the card set")
+            @PathVariable Long cardSetId) {
+        Response response = accessRequestService.revokeMyRequest(cardSetId);
+        return ResponseEntity.ok(response);
+    }
 }

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
-import { ArrowLeft, Save, Plus, Trash2, Globe, Lock } from 'lucide-react';
+import { ArrowLeft, Save, Globe, Lock, Plus } from 'lucide-react';
 import DashboardLayout from '../components/DashboardLayout';
 import { cardSetsAPI } from '../services/api';
 import toast from 'react-hot-toast';
@@ -12,10 +12,6 @@ const CreateCardSetPage = () => {
         name: '',
         isPublic: false,
     });
-    const [cards, setCards] = useState([
-        { term: '', definition: '' },
-        { term: '', definition: '' },
-    ]);
     const [errors, setErrors] = useState({});
 
     const createCardSetMutation = useMutation({
@@ -25,7 +21,8 @@ const CreateCardSetPage = () => {
         },
         onSuccess: (cardSet) => {
             toast.success('Card set created successfully!');
-            navigate(`/cardset/${cardSet.id}`);
+            // Redirect to add cards page for the new card set
+            navigate(`/cardset/${cardSet.id}/add-card`);
         },
         onError: (error) => {
             toast.error('Failed to create card set');
@@ -48,31 +45,11 @@ const CreateCardSetPage = () => {
         }
     };
 
-    const handleCardChange = (index, field, value) => {
-        const newCards = [...cards];
-        newCards[index] = { ...newCards[index], [field]: value };
-        setCards(newCards);
-    };
-
-    const addCard = () => {
-        setCards([...cards, { term: '', definition: '' }]);
-    };
-
-    const removeCard = (index) => {
-        if (cards.length > 2) {
-            setCards(cards.filter((_, i) => i !== index));
-        }
-    };
-
     const validateForm = () => {
         const newErrors = {};
 
         if (!formData.name.trim()) {
             newErrors.name = 'Card set name is required';
-        }
-        const validCards = cards.filter(card => card.term.trim() && card.definition.trim());
-        if (validCards.length === 0) {
-            newErrors.cards = 'At least one complete card (term and definition) is required';
         }
 
         setErrors(newErrors);
@@ -83,8 +60,6 @@ const CreateCardSetPage = () => {
         e.preventDefault();
 
         if (!validateForm()) return;
-
-        const validCards = cards.filter(card => card.term.trim() && card.definition.trim());
 
         const cardSetData = {
             name: formData.name.trim(),
@@ -98,7 +73,7 @@ const CreateCardSetPage = () => {
 
     return (
         <DashboardLayout>
-            <div className="max-w-4xl mx-auto">
+            <div className="max-w-2xl mx-auto">
                 {/* Header */}
                 <div className="flex items-center space-x-4 mb-8">
                     <button
@@ -157,8 +132,8 @@ const CreateCardSetPage = () => {
                                             <Lock size={16} className="text-gray-500" />
                                         )}
                                         <span className="text-sm font-medium text-gray-700">
-                      Make this card set public
-                    </span>
+                                            Make this card set public
+                                        </span>
                                     </div>
                                 </label>
                                 <p className="mt-1 text-sm text-gray-500 ml-7">
@@ -171,84 +146,44 @@ const CreateCardSetPage = () => {
                         </div>
                     </div>
 
-                    {/* Cards Section */}
-                    <div className="card">
-                        <div className="flex items-center justify-between mb-6">
-                            <h2 className="text-xl font-semibold text-gray-900">Cards</h2>
-                            <button
-                                type="button"
-                                onClick={addCard}
-                                className="btn-outline flex items-center space-x-2"
-                                disabled={isLoading}
-                            >
-                                <Plus size={16} />
-                                <span>Add Card</span>
-                            </button>
-                        </div>
-
-                        {errors.cards && (
-                            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-                                <p className="text-sm text-red-600">{errors.cards}</p>
+                    {/* Next Steps Info */}
+                    <div className="card bg-blue-50 border-blue-200">
+                        <div className="flex items-start space-x-3">
+                            <Plus className="w-5 h-5 text-blue-600 mt-0.5" />
+                            <div>
+                                <h3 className="text-sm font-medium text-blue-900 mb-1">Next Steps</h3>
+                                <p className="text-sm text-blue-700">
+                                    After creating your card set, you'll be taken to the card creation page where you can add your first cards.
+                                </p>
                             </div>
-                        )}
-
-                        <div className="space-y-4">
-                            {cards.map((card, index) => (
-                                <div key={index} className="border border-gray-200 rounded-lg p-4">
-                                    <div className="flex items-center justify-between mb-3">
-                                        <span className="text-sm font-medium text-gray-700">Card {index + 1}</span>
-                                        {cards.length > 2 && (
-                                            <button
-                                                type="button"
-                                                onClick={() => removeCard(index)}
-                                                className="p-1 text-gray-400 hover:text-red-600 transition-colors"
-                                                disabled={isLoading}
-                                            >
-                                                <Trash2 size={16} />
-                                            </button>
-                                        )}
-                                    </div>
-
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                                Term
-                                            </label>
-                                            <input
-                                                type="text"
-                                                value={card.term}
-                                                onChange={(e) => handleCardChange(index, 'term', e.target.value)}
-                                                placeholder="Enter the term or question"
-                                                className="input"
-                                                disabled={isLoading}
-                                            />
-                                        </div>
-
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                                Definition
-                                            </label>
-                                            <textarea
-                                                value={card.definition}
-                                                onChange={(e) => handleCardChange(index, 'definition', e.target.value)}
-                                                placeholder="Enter the definition or answer"
-                                                rows={3}
-                                                className="input resize-none"
-                                                disabled={isLoading}
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
-                            ))}
                         </div>
+                    </div>
 
-                        <div className="mt-4 text-sm text-gray-500">
-                            <p>💡 Tip: You can add more cards after creating the set. We recommend starting with at least a few cards.</p>
+                    {/* Study Features Preview */}
+                    <div className="card bg-gray-50 border-gray-200">
+                        <h3 className="text-lg font-medium text-gray-900 mb-3">Features You'll Get</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-600">
+                            <div className="flex items-center space-x-2">
+                                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                                <span>Spaced repetition algorithm</span>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                                <span>Progress tracking</span>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                                <span>Study statistics</span>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                                <span>Mobile-friendly interface</span>
+                            </div>
                         </div>
                     </div>
 
                     {/* Actions */}
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between pt-6 border-t border-gray-200">
                         <button
                             type="button"
                             onClick={() => navigate('/dashboard')}

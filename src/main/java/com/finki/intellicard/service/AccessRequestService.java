@@ -1,9 +1,6 @@
 package com.finki.intellicard.service;
 
-import com.finki.intellicard.exceptions.CardNotFoundException;
-import com.finki.intellicard.exceptions.CardSetNotFoundException;
-import com.finki.intellicard.exceptions.UnauthorizedAccessException;
-import com.finki.intellicard.exceptions.UserNotFoundException;
+import com.finki.intellicard.exceptions.*;
 import jakarta.transaction.Transactional;
 import com.finki.intellicard.model.AccessRequest;
 import com.finki.intellicard.model.CardSet;
@@ -135,5 +132,20 @@ public class AccessRequestService {
                 request.getRequester().getUsername(),
                 request.getStatus().toString()
         );
+    }
+
+    public Response revokeMyRequest(Long cardSetId) {
+        String username = myUserDetailsService.getUsername();
+        Long currentUserId = myUserDetailsService.getUserIdByUsername(username);
+
+        Optional<AccessRequest> request = accessRequestRepository
+                .findByCardSetIdAndRequesterId(cardSetId, currentUserId);
+
+        if (request.isPresent()) {
+            accessRequestRepository.delete(request.get());
+            return new Response("message", "Access request revoked successfully");
+        } else {
+            throw new AccessRequestNotFoundException("No pending request found");
+        }
     }
 }

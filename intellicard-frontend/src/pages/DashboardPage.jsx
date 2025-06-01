@@ -33,7 +33,8 @@ const DashboardPage = () => {
     const [selectedCardSet, setSelectedCardSet] = useState(null);
     const [showPendingRequestsModal, setShowPendingRequestsModal] = useState(false);
     const [pendingRequests, setPendingRequests] = useState([]);
-
+    const [showCancelRequestModal, setShowCancelRequestModal] = useState(false);
+    const [requestToCancel, setRequestToCancel] = useState(null);
     const { data: cardSets, isLoading, error, refetch } = useQuery({
         queryKey: ['cardSets'],
         queryFn: async () => {
@@ -112,6 +113,25 @@ const DashboardPage = () => {
         }
     };
 
+    const handleRevokeRequest = async (cardSet) => {
+        setRequestToCancel(cardSet);
+        setShowCancelRequestModal(true);
+    };
+
+    const confirmRevokeRequest = async () => {
+        if (!requestToCancel) return;
+
+        try {
+            await accessRequestsAPI.revoke(requestToCancel.id);
+            toast.success('Access request revoked successfully');
+            refetch(); // Refresh to update the access status
+            setShowCancelRequestModal(false);
+            setRequestToCancel(null);
+        } catch (error) {
+            toast.error('Failed to revoke access request');
+        }
+    };
+
     const fetchPendingRequests = async (cardSetId) => {
         try {
             const response = await accessRequestsAPI.getPending(cardSetId);
@@ -170,7 +190,7 @@ const DashboardPage = () => {
             case 'REJECTED':
                 return 'Rejected';
             default:
-                return 'Unknown';
+                return 'Requires access';
         }
     };
 
@@ -424,7 +444,10 @@ const DashboardPage = () => {
                                             </Link>
 
                                             {/* Study button - only show if has access and cards exist */}
-                                            {(cardSet.accessType === 'OWNER' || cardSet.accessType === 'ACCESSIBLE') && stats.totalCards > 0 && (
+                                            {(
+                                                cardSet.accessType === 'OWNER' ||
+                                                cardSet.accessType === 'ACCESSIBLE' ||
+                                                cardSet.accessType === 'PUBLIC') && stats.totalCards > 0 && (
                                                 <Link
                                                     to={`/cardset/${cardSet.id}/study`}
                                                     className="btn-primary flex items-center space-x-1 px-3 py-1 text-sm"
@@ -435,19 +458,22 @@ const DashboardPage = () => {
                                                 </Link>
                                             )}
 
-                                            {/* Request Access button - only show for inaccessible private sets */}
-                                            {!cardSet.isPublic && cardSet.accessType !== 'OWNER' && cardSet.accessType !== 'ACCESSIBLE' && cardSet.accessType !== 'PENDING' && (
-                                                <button
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        handleRequestAccess(cardSet);
-                                                    }}
-                                                    className="btn-primary flex items-center space-x-1 px-3 py-1 text-sm"
-                                                >
-                                                    <UserPlus size={14} />
-                                                    <span>Request</span>
-                                                </button>
-                                            )}
+                                            {!cardSet.isPublic &&
+                                                cardSet.accessType !== 'OWNER' &&
+                                                cardSet.accessType !== 'ACCESSIBLE' &&
+                                                cardSet.accessType !== 'PENDING' &&
+                                                cardSet.accessType !== 'REJECTED' && (
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleRequestAccess(cardSet);
+                                                        }}
+                                                        className="btn-primary flex items-center space-x-1 px-3 py-1 text-sm"
+                                                    >
+                                                        <UserPlus size={14} />
+                                                        <span>Request</span>
+                                                    </button>
+                                                )}
                                         </div>
                                     </div>
 
@@ -472,19 +498,33 @@ const DashboardPage = () => {
                                     {/* Status message for pending/rejected requests */}
                                     {(cardSet.accessType === 'PENDING' || cardSet.accessType === 'REJECTED') && (
                                         <div className="mt-3 pt-3 border-t border-gray-100">
-                                            <div className={`flex items-center space-x-2 text-xs ${
+                                            <div className={`flex items-center justify-between text-xs ${
                                                 cardSet.accessType === 'PENDING' ? 'text-yellow-600' : 'text-red-600'
                                             }`}>
-                                                {cardSet.accessType === 'PENDING' ? (
-                                                    <>
-                                                        <Clock size={12} />
-                                                        <span>Access request pending approval</span>
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <XCircle size={12} />
-                                                        <span>Access request was rejected</span>
-                                                    </>
+                                                <div className="flex items-center space-x-2">
+                                                    {cardSet.accessType === 'PENDING' ? (
+                                                        <>
+                                                            <Clock size={12} />
+                                                            <span>Access request pending approval</span>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <XCircle size={12} />
+                                                            <span>Access request was rejected</span>
+                                                        </>
+                                                    )}
+                                                </div>
+                                                {cardSet.accessType === 'PENDING' && (
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleRevokeRequest(cardSet);
+                                                        }}
+                                                        className="text-red-600 hover:text-red-800 underline"
+                                                        title="Cancel request"
+                                                    >
+                                                        Cancel
+                                                    </button>
                                                 )}
                                             </div>
                                         </div>
@@ -495,7 +535,35 @@ const DashboardPage = () => {
                     </div>
                 )}
             </div>
-
+            {/* Cancel Request Confirmation Modal */}
+            {showCancelRequestModal && (
+                <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+                        <h3 className="text-lg font-medium text-gray-900 mb-4">Cancel Access Request</h3>
+                        <p className="text-sm text-gray-500 mb-6">
+                            Are you sure you want to cancel your access request for "{requestToCancel?.name}"?
+                            You can request access again later if needed.
+                        </p>
+                        <div className="flex justify-end space-x-3">
+                            <button
+                                onClick={() => {
+                                    setShowCancelRequestModal(false);
+                                    setRequestToCancel(null);
+                                }}
+                                className="btn-secondary"
+                            >
+                                Keep Request
+                            </button>
+                            <button
+                                onClick={confirmRevokeRequest}
+                                className="btn-danger"
+                            >
+                                Cancel Request
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
             {/* Pending Access Requests Modal */}
             {showPendingRequestsModal && (
                 <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
