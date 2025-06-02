@@ -4,7 +4,6 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 
-// Pages
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import DashboardPage from './pages/DashboardPage';
@@ -14,10 +13,8 @@ import CreateCardSetPage from './pages/CreateCardSetPage';
 import EditCardSetPage from './pages/EditCardSetPage.jsx';
 import AddCardPage from './pages/AddCardPage';
 
-// Components
 import LoadingSpinner from './components/LoadingSpinner';
 
-// Create a client
 const queryClient = new QueryClient({
     defaultOptions: {
         queries: {
@@ -27,7 +24,6 @@ const queryClient = new QueryClient({
     },
 });
 
-// Protected Route Component
 const ProtectedRoute = ({ children }) => {
     const { isAuthenticated, loading } = useAuth();
 
@@ -42,7 +38,6 @@ const ProtectedRoute = ({ children }) => {
     return children;
 };
 
-// Public Route Component (redirect if already authenticated)
 const PublicRoute = ({ children }) => {
     const { isAuthenticated, loading } = useAuth();
 
@@ -57,7 +52,6 @@ const PublicRoute = ({ children }) => {
     return children;
 };
 
-// App Routes Component (needs to be inside AuthProvider)
 const AppRoutes = () => {
     return (
         <Routes>

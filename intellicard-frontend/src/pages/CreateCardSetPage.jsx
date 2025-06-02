@@ -21,7 +21,6 @@ const CreateCardSetPage = () => {
         },
         onSuccess: (cardSet) => {
             toast.success('Card set created successfully!');
-            // Redirect to add cards page for the new card set
             navigate(`/cardset/${cardSet.id}/add-card`);
         },
         onError: (error) => {

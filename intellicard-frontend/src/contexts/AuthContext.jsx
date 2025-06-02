@@ -54,11 +54,9 @@ export const AuthProvider = ({ children }) => {
             setUser(userData);
             setIsAuthenticated(true);
 
-            toast.success('Login successful!');
             return { success: true };
         } catch (error) {
             const message = error.response?.data || 'Login failed';
-            toast.error(message);
             return { success: false, error: message };
         }
     };
@@ -86,7 +84,7 @@ export const AuthProvider = ({ children }) => {
     const checkUsername = async (username) => {
         try {
             const response = await authAPI.checkUsername(username);
-            return response.data; // Returns boolean
+            return response.data;
         } catch (error) {
             return false;
         }

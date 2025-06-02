@@ -8,6 +8,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -62,5 +63,25 @@ public class CardController {
             @PathVariable Long cardId) {
         cardService.deleteCard(cardId);
         return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/{cardSetId}/generate-cards")
+    public ResponseEntity<List<CardRecord>> generateCardsFromDocument(
+            @PathVariable Long cardSetId,
+            @RequestParam("file") MultipartFile file,
+            @RequestParam("questionCount") Integer questionCount,
+            @RequestParam("difficultyLevel") String difficultyLevel,
+            @RequestParam("language") String language) {
+
+        try {
+            List<CardRecord> generatedCards = cardService.generateCardsFromDocument(
+                    cardSetId, file, questionCount, difficultyLevel, language);
+
+            return ResponseEntity.ok(generatedCards);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(null);
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(null);
+        }
     }
 }

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { Brain, Eye, EyeOff, Loader2 } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 const LoginPage = () => {
     const [formData, setFormData] = useState({
@@ -46,18 +47,27 @@ const LoginPage = () => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        e.stopPropagation();
 
         if (!validateForm()) return;
 
         setLoading(true);
 
-        const result = await login(formData);
+        try {
+            const result = await login(formData);
 
-        if (result.success) {
-            navigate('/dashboard');
+            if (result.success) {
+                toast.success('Welcome back!');
+                navigate('/dashboard');
+            } else {
+                console.log("yoo")
+                toast.error(result.error || 'Invalid login credentials!');
+            }
+        } catch (error) {
+            toast.error('Login failed. Please try again.');
+        } finally {
+            setLoading(false);
         }
-
-        setLoading(false);
     };
 
     return (
@@ -74,7 +84,7 @@ const LoginPage = () => {
 
                 {/* Login Form */}
                 <div className="card">
-                    <form onSubmit={handleSubmit} className="space-y-6">
+                    <form className="space-y-6">
                         {/* Username Field */}
                         <div>
                             <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-2">
@@ -127,7 +137,8 @@ const LoginPage = () => {
 
                         {/* Login Button */}
                         <button
-                            type="submit"
+                            type="button"
+                            onClick={handleSubmit}
                             disabled={loading}
                             className="w-full btn-primary flex items-center justify-center space-x-2 py-3"
                         >
@@ -154,13 +165,6 @@ const LoginPage = () => {
                             </Link>
                         </p>
                     </div>
-                </div>
-
-                {/* Demo Credentials */}
-                <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                    <p className="text-sm text-blue-800 font-medium mb-2">Demo Credentials:</p>
-                    <p className="text-sm text-blue-700">Username: demo</p>
-                    <p className="text-sm text-blue-700">Password: password</p>
                 </div>
             </div>
         </div>

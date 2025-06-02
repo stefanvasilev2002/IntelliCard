@@ -19,7 +19,6 @@ const EditCardSetPage = () => {
     const [cards, setCards] = useState([]);
     const [errors, setErrors] = useState({});
 
-    // Fetch card set details
     const { data: cardSet, isLoading: cardSetLoading } = useQuery({
         queryKey: ['cardSet', id],
         queryFn: async () => {
@@ -28,7 +27,6 @@ const EditCardSetPage = () => {
         },
     });
 
-    // Fetch cards
     const { data: existingCards, isLoading: cardsLoading } = useQuery({
         queryKey: ['cards', id],
         queryFn: async () => {
@@ -38,7 +36,6 @@ const EditCardSetPage = () => {
         enabled: !!id,
     });
 
-    // Update card set mutation
     const updateCardSetMutation = useMutation({
         mutationFn: async (data) => {
             const response = await cardSetsAPI.update(id, data);
@@ -54,7 +51,6 @@ const EditCardSetPage = () => {
         },
     });
 
-    // Add card mutation
     const addCardMutation = useMutation({
         mutationFn: async (cardData) => {
             const response = await cardsAPI.create(id, cardData);
@@ -69,7 +65,6 @@ const EditCardSetPage = () => {
         },
     });
 
-    // Update card mutation
     const updateCardMutation = useMutation({
         mutationFn: async ({ cardId, cardData }) => {
             const response = await cardsAPI.update(cardId, cardData);
@@ -84,7 +79,6 @@ const EditCardSetPage = () => {
         },
     });
 
-    // Delete card mutation
     const deleteCardMutation = useMutation({
         mutationFn: async (cardId) => {
             await cardsAPI.delete(cardId);
@@ -98,7 +92,6 @@ const EditCardSetPage = () => {
         },
     });
 
-    // Initialize form data when cardSet loads
     useEffect(() => {
         if (cardSet) {
             setFormData({
@@ -108,7 +101,6 @@ const EditCardSetPage = () => {
         }
     }, [cardSet]);
 
-    // Initialize cards when existing cards load
     useEffect(() => {
         if (existingCards) {
             setCards(existingCards.map(card => ({ ...card, isExisting: true })));
@@ -144,14 +136,12 @@ const EditCardSetPage = () => {
         const card = cards[index];
 
         if (card.isExisting && card.id) {
-            // Delete existing card
             if (window.confirm('Are you sure you want to delete this card?')) {
                 deleteCardMutation.mutate(card.id);
                 const newCards = cards.filter((_, i) => i !== index);
                 setCards(newCards);
             }
         } else {
-            // Remove new card (not saved yet)
             const newCards = cards.filter((_, i) => i !== index);
             setCards(newCards);
         }
@@ -166,7 +156,6 @@ const EditCardSetPage = () => {
         }
 
         if (card.isExisting && card.id) {
-            // Update existing card
             updateCardMutation.mutate({
                 cardId: card.id,
                 cardData: {
@@ -175,13 +164,11 @@ const EditCardSetPage = () => {
                 }
             });
         } else {
-            // Add new card
             addCardMutation.mutate({
                 term: card.term,
                 definition: card.definition
             });
 
-            // Remove from local state since it will be refetched
             const newCards = cards.filter((_, i) => i !== index);
             setCards(newCards);
         }
