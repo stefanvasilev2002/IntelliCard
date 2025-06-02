@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import {BrowserRouter as Router, Routes, Route, Navigate, useLocation} from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
@@ -14,6 +14,7 @@ import EditCardSetPage from './pages/EditCardSetPage.jsx';
 import AddCardPage from './pages/AddCardPage';
 
 import LoadingSpinner from './components/LoadingSpinner';
+import PrivacyPage from "./pages/PrivacyPage.jsx";
 
 const queryClient = new QueryClient({
     defaultOptions: {
@@ -46,6 +47,12 @@ const PublicRoute = ({ children }) => {
     }
 
     if (isAuthenticated) {
+        const location = useLocation();
+        const isPrivacyRoute = location.pathname === '/privacy';
+
+        if (isPrivacyRoute) {
+            return <PrivacyPage />;
+        }
         return <Navigate to="/dashboard" replace />;
     }
 
@@ -72,7 +79,14 @@ const AppRoutes = () => {
                     </PublicRoute>
                 }
             />
-
+            <Route
+                path="/privacy"
+                element={
+                    <PublicRoute>
+                        <PrivacyPage />
+                    </PublicRoute>
+                }
+            />
             {/* Protected Routes */}
             <Route
                 path="/dashboard"
