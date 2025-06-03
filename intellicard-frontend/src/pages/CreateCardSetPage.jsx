@@ -25,7 +25,6 @@ const CreateCardSetPage = () => {
         },
         onError: (error) => {
             toast.error('Failed to create card set');
-            console.error('Error creating card set:', error);
         },
     });
 

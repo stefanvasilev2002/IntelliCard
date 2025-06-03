@@ -52,7 +52,6 @@ const AddCardPage = () => {
         },
         onError: (error) => {
             toast.error('Failed to add card');
-            console.error('Error adding card:', error);
         },
     });
 

@@ -31,6 +31,7 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import DocumentCardGenerator from '../components/DocumentCardGenerator';
 import { cardSetsAPI, cardsAPI, studyAPI } from '../services/api';
 import toast from 'react-hot-toast';
+import EnhancedStudyOptions from "../components/EnhancedStudyOptions.jsx";
 
 const CardSetPage = () => {
     const { id } = useParams();
@@ -202,6 +203,12 @@ const CardSetPage = () => {
         });
     };
 
+    const handleStartStudy = (studyConfig) => {
+        sessionStorage.setItem('studyConfig', JSON.stringify(studyConfig));
+
+        navigate(`/cardset/${id}/study`);
+    };
+
     const getAccessIcon = (accessType) => {
         switch (accessType) {
             case 'OWNER':
@@ -279,14 +286,6 @@ const CardSetPage = () => {
                 return 'border-blue-200 hover:border-blue-300 bg-gradient-to-br from-blue-50 to-indigo-50 shadow-lg shadow-blue-100/50';
         }
     };
-
-    const getDueCardsStyle = (dueCards) => {
-        if (dueCards === 0) return 'text-green-600 font-medium';
-        if (dueCards > 10) return 'text-red-600 font-bold';
-        if (dueCards > 5) return 'text-orange-600 font-medium';
-        return 'text-yellow-600 font-medium';
-    };
-
     const getMasteryPercentage = () => {
         if (!studyOverview || studyOverview.totalCards === 0) return 0;
         return Math.round((studyOverview.masteredCards / studyOverview.totalCards) * 100);
@@ -329,14 +328,13 @@ const CardSetPage = () => {
     }
 
     const isOwner = cardSet?.accessType === 'OWNER';
-    const canStudy = cards && cards.length > 0;
     const masteryPercentage = getMasteryPercentage();
 
     return (
         <DashboardLayout>
             <div className="max-w-6xl mx-auto">
-                {/* Enhanced Header */}
-                <div className="flex items-center space-x-4 mb-8">
+                {/* Header */}
+                <div className="flex items-center space-x-4 mb-6">
                     <button
                         onClick={() => navigate('/dashboard')}
                         className="p-2 text-gray-400 hover:text-gray-600 transition-colors rounded-lg hover:bg-gray-100"
@@ -361,123 +359,70 @@ const CardSetPage = () => {
                         </div>
                     </div>
 
-                    <div className="flex items-center space-x-3">
-                        {isOwner && (
-                            <div className="relative group">
-                                <button className="btn-secondary flex items-center space-x-2 hover:bg-gray-100 hover:shadow-md transition-all">
-                                    <Settings size={16} />
-                                    <span>Manage</span>
-                                    <MoreHorizontal size={16} />
+                    {/* Management Actions for Owners */}
+                    {isOwner && (
+                        <div className="relative group">
+                            <button className="btn-secondary flex items-center space-x-2 hover:bg-gray-100 hover:shadow-md transition-all">
+                                <Settings size={16} />
+                                <span>Manage</span>
+                                <MoreHorizontal size={16} />
+                            </button>
+                            <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10">
+                                <Link
+                                    to={`/cardset/${id}/add-card`}
+                                    className="flex items-center space-x-2 w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-50 transition-colors"
+                                >
+                                    <Plus size={14} />
+                                    <span>Add New Card</span>
+                                </Link>
+                                <button
+                                    onClick={() => setShowDocumentGenerator(true)}
+                                    className="flex items-center space-x-2 w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-50 transition-colors"
+                                >
+                                    <Wand2 size={14} />
+                                    <span>Generate from Document</span>
                                 </button>
-                                <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10">
-                                    <Link
-                                        to={`/cardset/${id}/add-card`}
-                                        className="flex items-center space-x-2 w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-50 transition-colors"
-                                    >
-                                        <Plus size={14} />
-                                        <span>Add New Card</span>
-                                    </Link>
-                                    <button
-                                        onClick={() => setShowDocumentGenerator(true)}
-                                        className="flex items-center space-x-2 w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-50 transition-colors"
-                                    >
-                                        <Wand2 size={14} />
-                                        <span>Generate from Document</span>
-                                    </button>
-                                    <Link
-                                        to={`/cardset/${id}/edit`}
-                                        className="flex items-center space-x-2 w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-50 rounded-b-lg transition-colors"
-                                    >
-                                        <Edit size={14} />
-                                        <span>Edit Card Set</span>
-                                    </Link>
-                                </div>
+                                <Link
+                                    to={`/cardset/${id}/edit`}
+                                    className="flex items-center space-x-2 w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-50 rounded-b-lg transition-colors"
+                                >
+                                    <Edit size={14} />
+                                    <span>Edit Card Set</span>
+                                </Link>
                             </div>
-                        )}
-
-                        {canStudy && (
-                            <Link
-                                to={`/cardset/${id}/study`}
-                                className={`btn-primary flex items-center space-x-2 hover:shadow-lg transition-all hover:scale-105 ${
-                                    studyOverview?.dueCards > 0 ? 'animate-pulse ring-2 ring-orange-200' : ''
-                                }`}
-                            >
-                                <Play size={16} />
-                                <span>Study</span>
-                                {studyOverview?.dueCards > 0 && (
-                                    <span className="bg-white bg-opacity-20 px-2 py-1 rounded-full text-xs font-bold">
-                                        {studyOverview.dueCards}
-                                    </span>
-                                )}
-                            </Link>
-                        )}
-                    </div>
+                        </div>
+                    )}
                 </div>
 
-                {/* Enhanced Stats Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-                    <div className="card hover:shadow-md transition-shadow">
-                        <div className="flex items-center">
-                            <div className="p-3 bg-blue-100 rounded-lg">
-                                <BookOpen className="w-6 h-6 text-blue-600" />
-                            </div>
-                            <div className="ml-4">
-                                <p className="text-sm font-medium text-gray-600">Total Cards</p>
-                                <p className="text-2xl font-bold text-gray-900">
-                                    {studyOverview?.totalCards || cards?.length || 0}
+                {/* PROMINENT STUDY SECTION - Clean and Accessible */}
+                <div className="mb-8">
+                    <div className="bg-gradient-to-r from-blue-50 to-indigo-100 border border-blue-200 rounded-xl p-6 shadow-lg">
+                        <div className="flex items-center justify-between mb-4">
+                            <div>
+                                <h2 className="text-xl font-bold text-blue-900 mb-1 flex items-center space-x-2">
+                                    <Play className="w-6 h-6 text-blue-600" />
+                                    <span>Ready to Study?</span>
+                                </h2>
+                                <p className="text-blue-700 text-sm">
+                                    Choose your study mode and start learning
                                 </p>
                             </div>
+                            {studyOverview?.dueCards > 0 && (
+                                <div className="bg-orange-100 border border-orange-300 rounded-lg px-3 py-2 text-center">
+                                    <div className="text-orange-700 text-xs font-medium">Cards Due</div>
+                                    <div className="text-orange-800 text-xl font-bold">{studyOverview.dueCards}</div>
+                                </div>
+                            )}
                         </div>
-                    </div>
 
-                    <div className="card hover:shadow-md transition-shadow">
-                        <div className="flex items-center">
-                            <div className={`p-3 rounded-lg ${
-                                studyOverview?.dueCards > 10 ? 'bg-red-100' :
-                                    studyOverview?.dueCards > 5 ? 'bg-orange-100' :
-                                        studyOverview?.dueCards > 0 ? 'bg-yellow-100' : 'bg-green-100'
-                            }`}>
-                                <Clock className={`w-6 h-6 ${
-                                    studyOverview?.dueCards > 10 ? 'text-red-600' :
-                                        studyOverview?.dueCards > 5 ? 'text-orange-600' :
-                                            studyOverview?.dueCards > 0 ? 'text-yellow-600' : 'text-green-600'
-                                }`} />
-                            </div>
-                            <div className="ml-4">
-                                <p className="text-sm font-medium text-gray-600">Due for Review</p>
-                                <p className={`text-2xl font-bold ${getDueCardsStyle(studyOverview?.dueCards || 0)}`}>
-                                    {studyOverview?.dueCards || 0}
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="card hover:shadow-md transition-shadow">
-                        <div className="flex items-center">
-                            <div className="p-3 bg-yellow-100 rounded-lg">
-                                <Target className="w-6 h-6 text-yellow-600" />
-                            </div>
-                            <div className="ml-4">
-                                <p className="text-sm font-medium text-gray-600">Learning</p>
-                                <p className="text-2xl font-bold text-gray-900">
-                                    {studyOverview?.learningCards || 0}
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="card hover:shadow-md transition-shadow">
-                        <div className="flex items-center">
-                            <div className="p-3 bg-green-100 rounded-lg">
-                                <CheckCircle className="w-6 h-6 text-green-600" />
-                            </div>
-                            <div className="ml-4">
-                                <p className="text-sm font-medium text-gray-600">Mastered</p>
-                                <p className="text-2xl font-bold text-green-600">
-                                    {studyOverview?.masteredCards || 0}
-                                </p>
-                            </div>
-                        </div>
+                        {/* Enhanced Study Options Component */}
+                        <EnhancedStudyOptions
+                            cardSetId={id}
+                            cards={cards}
+                            studyOverview={studyOverview}
+                            isOwner={isOwner}
+                            onStartStudy={handleStartStudy}
+                        />
                     </div>
                 </div>
 
@@ -525,7 +470,7 @@ const CardSetPage = () => {
                     </div>
                 )}
 
-                {/* Enhanced Cards Section with Pagination */}
+                {/* Enhanced Cards Section with Pagination - keeping all your existing code */}
                 <div className="card">
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
                         <h2 className="text-xl font-semibold text-gray-900">All Cards</h2>

@@ -22,7 +22,7 @@ import {
 
 const PrivacyPage = () => {
     const [expandedSections, setExpandedSections] = useState({});
-    const lastUpdated = "June 2, 2025";
+    const lastUpdated = "June 3, 2025";
 
     const toggleSection = (sectionId) => {
         setExpandedSections(prev => ({
@@ -402,42 +402,6 @@ const PrivacyPage = () => {
                             </li>
                         </ul>
                     </div>
-                </div>
-
-                {/* Quick Actions */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-8">
-                    <button className="bg-white rounded-lg p-4 shadow-sm border hover:shadow-lg transition-all flex items-center space-x-3">
-                        <div className="p-2 bg-blue-100 rounded-lg">
-                            <Lock className="w-5 h-5 text-blue-600" />
-                        </div>
-                        <div className="text-left">
-                            <h3 className="font-semibold text-gray-900">Privacy Settings</h3>
-                            <p className="text-sm text-gray-600">Manage your privacy preferences</p>
-                        </div>
-                        <ExternalLink className="w-4 h-4 text-gray-400" />
-                    </button>
-
-                    <button className="bg-white rounded-lg p-4 shadow-sm border hover:shadow-lg transition-all flex items-center space-x-3">
-                        <div className="p-2 bg-green-100 rounded-lg">
-                            <Download className="w-5 h-5 text-green-600" />
-                        </div>
-                        <div className="text-left">
-                            <h3 className="font-semibold text-gray-900">Download Data</h3>
-                            <p className="text-sm text-gray-600">Export your personal data</p>
-                        </div>
-                        <ExternalLink className="w-4 h-4 text-gray-400" />
-                    </button>
-
-                    <button className="bg-white rounded-lg p-4 shadow-sm border hover:shadow-lg transition-all flex items-center space-x-3">
-                        <div className="p-2 bg-red-100 rounded-lg">
-                            <Trash2 className="w-5 h-5 text-red-600" />
-                        </div>
-                        <div className="text-left">
-                            <h3 className="font-semibold text-gray-900">Delete Account</h3>
-                            <p className="text-sm text-gray-600">Permanently remove your data</p>
-                        </div>
-                        <ExternalLink className="w-4 h-4 text-gray-400" />
-                    </button>
                 </div>
 
                 {/* Contact Information */}

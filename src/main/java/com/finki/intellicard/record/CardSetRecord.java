@@ -6,5 +6,6 @@ public record CardSetRecord(
         Boolean isPublic,
         Long creatorId,
         String creatorName,
-        String accessType) {
+        String accessType,
+        Integer totalCards) {
 }

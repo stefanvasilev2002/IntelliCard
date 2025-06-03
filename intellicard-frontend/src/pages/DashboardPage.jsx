@@ -500,7 +500,7 @@ const DashboardPage = () => {
                                         <div className="flex items-center space-x-4 text-sm text-gray-500">
                                             <div className="flex items-center space-x-1">
                                                 <BookOpen size={14} />
-                                                <span>{stats.totalCards} cards</span>
+                                                <span>{cardSet.totalCards} cards</span>
                                             </div>
                                             <div className="flex items-center space-x-1">
                                                 <Clock size={14} />

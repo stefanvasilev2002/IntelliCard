@@ -47,7 +47,6 @@ const EditCardSetPage = () => {
         },
         onError: (error) => {
             toast.error('Failed to update card set');
-            console.error('Error updating card set:', error);
         },
     });
 

@@ -11,22 +11,20 @@ import {
     MoreHorizontal,
     RotateCcw,
     TrendingUp,
-    Clock,
     Target,
     Brain,
     CheckCircle,
     XCircle,
     AlertCircle,
     Zap,
-    Award,
     BarChart3,
     Timer,
-    Star,
     Flame,
     Trophy,
     Shuffle,
     Pause,
-    Play
+    Play,
+    Filter
 } from 'lucide-react';
 import DashboardLayout from '../components/DashboardLayout';
 import LoadingSpinner from '../components/LoadingSpinner';
@@ -37,6 +35,10 @@ const StudyPage = () => {
     const { id } = useParams();
     const navigate = useNavigate();
     const queryClient = useQueryClient();
+
+    const [studyConfig, setStudyConfig] = useState(null);
+    const [studyCards, setStudyCards] = useState([]);
+    const [originalCards, setOriginalCards] = useState([]);
 
     const [currentCardIndex, setCurrentCardIndex] = useState(0);
     const [isFlipped, setIsFlipped] = useState(false);
@@ -64,7 +66,7 @@ const StudyPage = () => {
         },
     });
 
-    const { data: cards, isLoading, error, refetch } = useQuery({
+    const { data: allCards, isLoading, error, refetch } = useQuery({
         queryKey: ['studyCards', id],
         queryFn: async () => {
             const response = await cardsAPI.getByCardSetId(id);
@@ -81,6 +83,57 @@ const StudyPage = () => {
         },
         enabled: !!id,
     });
+
+    useEffect(() => {
+        if (allCards && allCards.length > 0) {
+            setOriginalCards(allCards);
+
+            const storedConfig = sessionStorage.getItem('studyConfig');
+            if (storedConfig) {
+                try {
+                    const config = JSON.parse(storedConfig);
+                    setStudyConfig(config);
+
+                    let cardsToStudy = config.cards || allCards;
+
+                    if (config.config?.shuffle) {
+                        cardsToStudy = shuffleArray([...cardsToStudy]);
+                    }
+
+                    setStudyCards(cardsToStudy);
+
+                    sessionStorage.removeItem('studyConfig');
+
+                    const modeLabels = {
+                        'smart': 'Smart Study (New & Due Cards)',
+                        'due-only': 'Due Cards Only',
+                        'new-only': 'New Cards Only',
+                        'mastered': 'Mastered Cards Review',
+                        'all': 'All Cards'
+                    };
+
+                    toast.success(`${modeLabels[config.studyType] || 'Study Mode'}: ${cardsToStudy.length} cards`, {
+                        icon: '📚',
+                        duration: 3000
+                    });
+
+                } catch (error) {
+                    setStudyCards(allCards);
+                }
+            } else {
+                setStudyCards(allCards);
+            }
+        }
+    }, [allCards]);
+
+    const shuffleArray = (array) => {
+        const shuffled = [...array];
+        for (let i = shuffled.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+        }
+        return shuffled;
+    };
 
     const reviewCardMutation = useMutation({
         mutationFn: async ({ cardId, correct, difficulty }) => {
@@ -135,15 +188,15 @@ const StudyPage = () => {
         },
     });
 
-    const currentCard = cards?.[currentCardIndex];
+    const currentCard = studyCards?.[currentCardIndex];
     const isOwner = cardSet?.accessType === 'OWNER';
-    const progress = cards ? ((currentCardIndex + 1) / cards.length) * 100 : 0;
+    const progress = studyCards?.length ? ((currentCardIndex + 1) / studyCards.length) * 100 : 0;
     const sessionTime = Math.floor((currentTime - studyStats.sessionStartTime) / 1000);
     const sessionTimeFormatted = sessionTime >= 60
         ? `${Math.floor(sessionTime / 60)}:${(sessionTime % 60).toString().padStart(2, '0')}`
         : `0:${sessionTime.toString().padStart(2, '0')}`;
     const accuracy = studyStats.cardsStudied > 0 ? Math.round((studyStats.correctAnswers / studyStats.cardsStudied) * 100) : 0;
-    const cardsRemaining = cards ? cards.length - currentCardIndex - 1 : 0;
+    const cardsRemaining = studyCards?.length ? studyCards.length - currentCardIndex - 1 : 0;
 
     const getTextSize = (text, isDefinition = false) => {
         if (!text) return 'text-lg';
@@ -186,7 +239,7 @@ const StudyPage = () => {
     };
 
     const nextCard = () => {
-        if (currentCardIndex < (cards?.length - 1)) {
+        if (currentCardIndex < (studyCards?.length - 1)) {
             setCurrentCardIndex(currentCardIndex + 1);
             setIsFlipped(false);
         }
@@ -200,14 +253,13 @@ const StudyPage = () => {
     };
 
     const shuffleCards = () => {
-        if (cards && cards.length > 1) {
-            const currentCard = cards[currentCardIndex];
-            const otherCards = cards.filter((_, index) => index !== currentCardIndex);
+        if (studyCards && studyCards.length > 1) {
+            const currentCard = studyCards[currentCardIndex];
+            const otherCards = studyCards.filter((_, index) => index !== currentCardIndex);
             const shuffled = [...otherCards].sort(() => Math.random() - 0.5);
             const newCards = [currentCard, ...shuffled];
 
-            queryClient.setQueryData(['studyCards', id], newCards);
-
+            setStudyCards(newCards);
             setCurrentCardIndex(0);
             setIsFlipped(false);
 
@@ -232,6 +284,19 @@ const StudyPage = () => {
         setIsPaused(false);
     };
 
+    const switchToAllCards = () => {
+        if (originalCards && originalCards.length > 0) {
+            setStudyCards(originalCards);
+            setCurrentCardIndex(0);
+            setIsFlipped(false);
+            setStudyConfig(null);
+            toast.success(`Switched to All Cards: ${originalCards.length} cards`, {
+                icon: '📚',
+                duration: 2000
+            });
+        }
+    };
+
     const handleReview = (correct, difficulty = 3) => {
         if (currentCard) {
             reviewCardMutation.mutate({
@@ -241,11 +306,11 @@ const StudyPage = () => {
             });
 
             setTimeout(() => {
-                if (currentCardIndex < (cards?.length - 1)) {
+                if (currentCardIndex < (studyCards?.length - 1)) {
                     nextCard();
                 } else {
                     const finalStats = {
-                        totalCards: cards.length,
+                        totalCards: studyCards.length,
                         cardsStudied: studyStats.cardsStudied + 1,
                         accuracy: Math.round(((studyStats.correctAnswers + (correct ? 1 : 0)) / (studyStats.cardsStudied + 1)) * 100),
                         bestStreak: Math.max(studyStats.bestStreak, correct ? studyStats.streak + 1 : studyStats.streak),
@@ -358,11 +423,11 @@ const StudyPage = () => {
 
         window.addEventListener('keydown', handleKeyPress);
         return () => window.removeEventListener('keydown', handleKeyPress);
-    }, [isFlipped, currentCardIndex, cards?.length, isPaused]);
+    }, [isFlipped, currentCardIndex, studyCards?.length, isPaused]);
 
     if (isLoading) return <LoadingSpinner />;
 
-    if (error || !cards || cards.length === 0) {
+    if (error || !studyCards || studyCards.length === 0) {
         return (
             <DashboardLayout>
                 <div className="max-w-4xl mx-auto">
@@ -379,17 +444,24 @@ const StudyPage = () => {
                     <div className="card text-center py-12">
                         <Brain className="mx-auto h-12 w-12 text-gray-400 mb-4" />
                         <h3 className="text-lg font-medium text-gray-900 mb-2">
-                            {cards?.length === 0 ? 'No cards available for study' : 'Failed to load cards'}
+                            {studyCards?.length === 0 ? 'No cards available for this study mode' : 'Failed to load cards'}
                         </h3>
                         <p className="text-gray-600 mb-6">
-                            {cards?.length === 0
-                                ? 'This card set doesn\'t have any cards yet. Add some cards to start studying.'
+                            {studyCards?.length === 0
+                                ? 'The selected study mode has no cards to study. Try a different study mode or add more cards.'
                                 : 'There was an error loading the cards. Please try again.'
                             }
                         </p>
-                        <Link to={`/cardset/${id}`} className="btn-primary">
-                            Back to Card Set
-                        </Link>
+                        <div className="space-x-3">
+                            <Link to={`/cardset/${id}`} className="btn-primary">
+                                Back to Card Set
+                            </Link>
+                            {originalCards && originalCards.length > 0 && studyCards?.length === 0 && (
+                                <button onClick={switchToAllCards} className="btn-secondary">
+                                    Study All Cards
+                                </button>
+                            )}
+                        </div>
                     </div>
                 </div>
             </DashboardLayout>
@@ -411,6 +483,12 @@ const StudyPage = () => {
                         <div>
                             <div className="flex items-center space-x-3">
                                 <h1 className="text-3xl font-bold text-gray-900">Study Mode</h1>
+                                {studyConfig && (
+                                    <span className="px-3 py-1 bg-blue-100 text-blue-800 text-sm font-medium rounded-full flex items-center space-x-1">
+                                        <Filter size={12} />
+                                        <span>{studyConfig.studyType.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())}</span>
+                                    </span>
+                                )}
                                 {isPaused && (
                                     <span className="px-3 py-1 bg-yellow-100 text-yellow-800 text-sm font-medium rounded-full animate-pulse">
                                         PAUSED
@@ -428,6 +506,18 @@ const StudyPage = () => {
                     </div>
 
                     <div className="flex items-center space-x-3">
+                        {/* Switch to All Cards button if using filtered study mode */}
+                        {studyConfig && originalCards && originalCards.length > studyCards.length && (
+                            <button
+                                onClick={switchToAllCards}
+                                className="btn-secondary flex items-center space-x-2 hover:shadow-md transition-all"
+                                title="Switch to studying all cards"
+                            >
+                                <Filter size={16} />
+                                <span className="hidden sm:inline">All Cards ({originalCards.length})</span>
+                            </button>
+                        )}
+
                         <button
                             onClick={() => setIsPaused(!isPaused)}
                             className={`btn-secondary flex items-center space-x-2 hover:shadow-md transition-all ${
@@ -497,6 +587,7 @@ const StudyPage = () => {
                     </div>
                 </div>
 
+                {/* Rest of your existing StudyPage JSX remains the same, just replace references to `cards` with `studyCards` */}
                 {/* Enhanced Progress & Stats */}
                 <div className={`grid gap-4 mb-6 ${showStats ? 'grid-cols-1 md:grid-cols-6' : 'grid-cols-1 md:grid-cols-4'}`}>
                     <div className="card hover:shadow-md transition-shadow">
@@ -580,6 +671,35 @@ const StudyPage = () => {
                     )}
                 </div>
 
+                {/* Continue with rest of your existing JSX, making sure to use studyCards instead of cards */}
+                {/* ... */}
+
+                {/* Enhanced Progress Bar */}
+                <div className="mb-6">
+                    <div className="flex justify-between text-sm text-gray-600 mb-2">
+                        <span>Card {currentCardIndex + 1} of {studyCards?.length}</span>
+                        <div className="flex items-center space-x-4">
+                            <span>{cardsRemaining} remaining</span>
+                            {studyConfig && (
+                                <span className="text-blue-600 font-medium">
+                                    {studyConfig.studyType.replace('-', ' ')} mode
+                                </span>
+                            )}
+                        </div>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                        <div className="relative h-full">
+                            <div
+                                className="bg-gradient-to-r from-blue-500 to-blue-600 h-full rounded-full transition-all duration-500 ease-out"
+                                style={{ width: `${progress}%` }}
+                            ></div>
+                            {studyStats.streak >= 5 && (
+                                <div className="absolute top-0 right-0 h-full w-8 bg-gradient-to-r from-orange-400 to-orange-500 opacity-75 animate-pulse"></div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+
                 {/* Study Settings */}
                 <div className="card mb-6">
                     <div className="flex items-center justify-between">
@@ -613,32 +733,6 @@ const StudyPage = () => {
                                     <option value={5}>5s</option>
                                     <option value={10}>10s</option>
                                 </select>
-                            )}
-                        </div>
-                    </div>
-                </div>
-
-                {/* Enhanced Progress Bar */}
-                <div className="mb-6">
-                    <div className="flex justify-between text-sm text-gray-600 mb-2">
-                        <span>Card {currentCardIndex + 1} of {cards?.length}</span>
-                        <div className="flex items-center space-x-4">
-                            <span>{cardsRemaining} remaining</span>
-                            {studyOverview && studyOverview.dueCards > 0 && (
-                                <span className="text-orange-600 font-medium">
-                                    {studyOverview.dueCards} due for review
-                                </span>
-                            )}
-                        </div>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
-                        <div className="relative h-full">
-                            <div
-                                className="bg-gradient-to-r from-blue-500 to-blue-600 h-full rounded-full transition-all duration-500 ease-out"
-                                style={{ width: `${progress}%` }}
-                            ></div>
-                            {studyStats.streak >= 5 && (
-                                <div className="absolute top-0 right-0 h-full w-8 bg-gradient-to-r from-orange-400 to-orange-500 opacity-75 animate-pulse"></div>
                             )}
                         </div>
                     </div>
@@ -727,12 +821,12 @@ const StudyPage = () => {
 
                     <div className="text-center">
                         <p className="text-lg font-semibold text-gray-900">
-                            {currentCardIndex + 1} / {cards?.length}
+                            {currentCardIndex + 1} / {studyCards?.length}
                         </p>
                         <div className="flex items-center justify-center space-x-4 mt-1 text-sm text-gray-500">
-                            {studyOverview && studyOverview.dueCards > 0 && (
-                                <span className="text-orange-600 font-medium">
-                                    {studyOverview.dueCards} due
+                            {studyConfig && (
+                                <span className="text-blue-600 font-medium">
+                                    {studyConfig.studyType.replace('-', ' ')}
                                 </span>
                             )}
                             {cardsRemaining > 0 && (
@@ -743,7 +837,7 @@ const StudyPage = () => {
 
                     <button
                         onClick={nextCard}
-                        disabled={currentCardIndex === (cards?.length - 1) || isPaused}
+                        disabled={currentCardIndex === (studyCards?.length - 1) || isPaused}
                         className="p-3 rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all hover:shadow-md"
                     >
                         <ChevronRight size={24} />

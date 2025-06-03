@@ -26,12 +26,12 @@ const DocumentCardGenerator = ({ cardSetId, onCardsGenerated, onClose }) => {
     const [isGenerating, setIsGenerating] = useState(false);
     const [error, setError] = useState('');
     const [generationProgress, setGenerationProgress] = useState(0);
-    const [uploadMethod, setUploadMethod] = useState('local'); // 'local' or 'drive'
+    const [uploadMethod, setUploadMethod] = useState('local');
 
     const [settings, setSettings] = useState({
-        questionCount: 10,
-        difficulty: 'MEDIUM',
-        language: 'English'
+        questionCount: 5,
+        difficulty: 'MIXED',
+        language: 'Macedonian'
     });
 
     const validateFile = (selectedFile) => {
@@ -60,7 +60,6 @@ const DocumentCardGenerator = ({ cardSetId, onCardsGenerated, onClose }) => {
 
         setFile(selectedFile);
 
-        // Create metadata for local files
         const fileExt = selectedFile.name.split('.').pop().toLowerCase();
         const metadata = {
             title: selectedFile.name.replace(/\.[^/.]+$/, ''),
@@ -88,7 +87,6 @@ const DocumentCardGenerator = ({ cardSetId, onCardsGenerated, onClose }) => {
         if (validateFile(selectedFile)) {
             setFile(selectedFile);
 
-            // Enhanced metadata from Google Drive
             const enhancedMetadata = {
                 ...metadata,
                 source: 'google_drive',
@@ -115,7 +113,6 @@ const DocumentCardGenerator = ({ cardSetId, onCardsGenerated, onClose }) => {
             formData.append('difficultyLevel', settings.difficulty);
             formData.append('language', settings.language);
 
-            // Add metadata if available
             if (documentMetadata) {
                 formData.append('documentTitle', documentMetadata.title);
                 formData.append('documentType', documentMetadata.type);
@@ -137,18 +134,16 @@ const DocumentCardGenerator = ({ cardSetId, onCardsGenerated, onClose }) => {
                 fileConstructor: file.constructor.name
             });
 
-            // Debug FormData contents
-            console.log('FormData entries:');
             for (let [key, value] of formData.entries()) {
                 if (value && typeof value === 'object' && value.name && value.size) {
-                    console.log(`  ${key}:`, {
+                    console.log(`  ${key}:`,
+                        {
                         name: value.name,
                         size: value.size,
                         type: value.type,
                         constructor: value.constructor.name
                     });
                 } else {
-                    console.log(`  ${key}:`, value);
                 }
             }
 
@@ -203,7 +198,6 @@ const DocumentCardGenerator = ({ cardSetId, onCardsGenerated, onClose }) => {
     };
 
     const switchUploadMethod = (method) => {
-        // Clear current file when switching methods
         if (file) {
             removeFile();
         }
@@ -412,7 +406,6 @@ const DocumentCardGenerator = ({ cardSetId, onCardsGenerated, onClose }) => {
                                             <option value={10}>10 cards</option>
                                             <option value={15}>15 cards</option>
                                             <option value={20}>20 cards</option>
-                                            <option value={25}>25 cards</option>
                                         </select>
                                     </div>
 
@@ -426,10 +419,10 @@ const DocumentCardGenerator = ({ cardSetId, onCardsGenerated, onClose }) => {
                                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                             disabled={isGenerating}
                                         >
+                                            <option value="MIXED">Mixed Difficulty</option>
                                             <option value="EASY">Easy</option>
                                             <option value="MEDIUM">Medium</option>
                                             <option value="HARD">Hard</option>
-                                            <option value="MIXED">Mixed Difficulty</option>
                                         </select>
                                     </div>
                                 </div>
@@ -444,12 +437,12 @@ const DocumentCardGenerator = ({ cardSetId, onCardsGenerated, onClose }) => {
                                         className="w-full max-w-xs px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                         disabled={isGenerating}
                                     >
+                                        <option value="Macedonian">Macedonian</option>
                                         <option value="English">English</option>
                                         <option value="Spanish">Spanish</option>
                                         <option value="French">French</option>
                                         <option value="German">German</option>
                                         <option value="Italian">Italian</option>
-                                        <option value="Macedonian">Macedonian</option>
                                     </select>
                                 </div>
 

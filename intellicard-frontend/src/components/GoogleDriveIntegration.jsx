@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FiCloud, FiDownload, FiFile, FiFolder } from 'react-icons/fi';
+import { FiCloud, FiFile, FiFolder } from 'react-icons/fi';
 
 const API_KEY = import.meta.env?.VITE_GOOGLE_API_KEY || process.env?.REACT_APP_GOOGLE_API_KEY;
 const CLIENT_ID = import.meta.env?.VITE_GOOGLE_CLIENT_ID || process.env?.REACT_APP_GOOGLE_CLIENT_ID;
@@ -16,9 +16,7 @@ const GoogleDriveIntegration = ({ onFileSelect, setFile, setDocumentMetadata }) 
     const [tokenClient, setTokenClient] = useState(null);
 
     useEffect(() => {
-        // Load Google API
         const loadGoogleApi = async () => {
-            // Load Google Identity Services script
             if (!window.google?.accounts?.oauth2) {
                 const gisScript = document.createElement('script');
                 gisScript.src = 'https://accounts.google.com/gsi/client';
@@ -30,7 +28,6 @@ const GoogleDriveIntegration = ({ onFileSelect, setFile, setDocumentMetadata }) 
                 initializeAuth();
             }
 
-            // Load Google API script
             if (!window.gapi) {
                 const gapiScript = document.createElement('script');
                 gapiScript.src = 'https://apis.google.com/js/api.js';
@@ -46,7 +43,6 @@ const GoogleDriveIntegration = ({ onFileSelect, setFile, setDocumentMetadata }) 
         loadGoogleApi();
 
         return () => {
-            // Cleanup
             setShowFileBrowser(false);
         };
     }, []);
@@ -59,24 +55,20 @@ const GoogleDriveIntegration = ({ onFileSelect, setFile, setDocumentMetadata }) 
                 scope: SCOPES,
                 callback: (response) => {
                     if (response.access_token) {
-                        // Store token in session storage
                         sessionStorage.setItem('google_drive_token', response.access_token);
                         setIsAuthorized(true);
 
-                        // If file browser is active, load files
                         if (showFileBrowser) {
                             listFiles('root');
                         }
                     }
                 },
                 error_callback: (err) => {
-                    console.error('Auth error:', err);
                     setError('Authentication failed. Please try again.');
                 }
             });
             setTokenClient(client);
         } catch (err) {
-            console.error('Error initializing authentication:', err);
             setError('Failed to initialize Google Drive integration');
         }
     };
@@ -90,7 +82,6 @@ const GoogleDriveIntegration = ({ onFileSelect, setFile, setDocumentMetadata }) 
                 });
                 await window.gapi.client.load('drive', 'v3');
             } catch (err) {
-                console.error('Error initializing gapi client:', err);
             }
         });
     };
@@ -98,34 +89,28 @@ const GoogleDriveIntegration = ({ onFileSelect, setFile, setDocumentMetadata }) 
     const handleSignIn = () => {
         try {
             if (tokenClient) {
-                // Request an access token
                 tokenClient.requestAccessToken();
             } else {
                 setError('Google authentication is not ready yet. Please try again in a moment.');
             }
         } catch (err) {
-            console.error('Sign in error:', err);
             setError('Failed to sign in to Google Drive');
         }
     };
 
     const handleSignOut = () => {
         try {
-            // Clear token from session storage
             sessionStorage.removeItem('google_drive_token');
             setIsAuthorized(false);
             setShowFileBrowser(false);
             setFiles([]);
 
-            // Revoke token if Google API is available
             const token = sessionStorage.getItem('google_drive_token');
             if (window.google?.accounts?.oauth2 && token) {
                 window.google.accounts.oauth2.revoke(token, () => {
-                    console.log('Token revoked');
                 });
             }
         } catch (err) {
-            console.error('Sign out error:', err);
         }
     };
 
@@ -136,7 +121,6 @@ const GoogleDriveIntegration = ({ onFileSelect, setFile, setDocumentMetadata }) 
         if (isAuthorized) {
             await listFiles('root');
         } else {
-            // Will trigger auth flow
             handleSignIn();
         }
     };
@@ -156,10 +140,8 @@ const GoogleDriveIntegration = ({ onFileSelect, setFile, setDocumentMetadata }) 
                 throw new Error('Not authenticated');
             }
 
-            // Update current folder
             setCurrentFolder(folderId);
 
-            // Query for files and folders in the current folder
             let query = `'${folderId}' in parents and trashed = false`;
 
             const response = await fetch(
@@ -178,9 +160,7 @@ const GoogleDriveIntegration = ({ onFileSelect, setFile, setDocumentMetadata }) 
             const data = await response.json();
             setFiles(data.files || []);
 
-            // Update folder path if navigating to a subfolder
             if (folderId !== 'root' && folderId !== folderPath[folderPath.length - 1].id) {
-                // Get folder name
                 const folderResponse = await fetch(
                     `https://www.googleapis.com/drive/v3/files/${folderId}?fields=name`,
                     {
@@ -194,24 +174,19 @@ const GoogleDriveIntegration = ({ onFileSelect, setFile, setDocumentMetadata }) 
                     const folderData = await folderResponse.json();
                     const newPath = [...folderPath];
 
-                    // Check if we're going back in the path
                     const existingIndex = newPath.findIndex(folder => folder.id === folderId);
                     if (existingIndex >= 0) {
-                        // Trim the path if we're going back
                         setFolderPath(newPath.slice(0, existingIndex + 1));
                     } else {
-                        // Add new folder to path
                         newPath.push({ id: folderId, name: folderData.name });
                         setFolderPath(newPath);
                     }
                 }
             } else if (folderId === 'root') {
-                // Reset to root
                 setFolderPath([{ id: 'root', name: 'My Drive' }]);
             }
 
         } catch (err) {
-            console.error('Error listing files:', err);
             setError('Failed to load files from Google Drive');
         } finally {
             setIsLoading(false);
@@ -228,7 +203,6 @@ const GoogleDriveIntegration = ({ onFileSelect, setFile, setDocumentMetadata }) 
                 throw new Error('Not authenticated');
             }
 
-            // Check for supported file type
             const fileExtension = file.name.split('.').pop().toLowerCase();
             if (!['pdf', 'docx', 'txt'].includes(fileExtension)) {
                 setError('Unsupported file format. Please select PDF, DOCX, or TXT files.');
@@ -236,7 +210,6 @@ const GoogleDriveIntegration = ({ onFileSelect, setFile, setDocumentMetadata }) 
                 return;
             }
 
-            // Get file metadata to check size
             const metadataResponse = await fetch(
                 `https://www.googleapis.com/drive/v3/files/${file.id}?fields=size,name`,
                 {
@@ -252,7 +225,6 @@ const GoogleDriveIntegration = ({ onFileSelect, setFile, setDocumentMetadata }) 
 
             const metadata = await metadataResponse.json();
 
-            // Check file size (5MB limit)
             const fileSize = parseInt(metadata.size || '0');
             if (fileSize > 5 * 1024 * 1024) {
                 setError('File is too large. Maximum size is 5MB.');
@@ -260,7 +232,6 @@ const GoogleDriveIntegration = ({ onFileSelect, setFile, setDocumentMetadata }) 
                 return;
             }
 
-            // Download file
             const downloadResponse = await fetch(
                 `https://www.googleapis.com/drive/v3/files/${file.id}?alt=media`,
                 {
@@ -276,7 +247,6 @@ const GoogleDriveIntegration = ({ onFileSelect, setFile, setDocumentMetadata }) 
 
             const blob = await downloadResponse.blob();
 
-            // Create file object
             const downloadedFile = new File(
                 [blob],
                 metadata.name,
@@ -286,7 +256,6 @@ const GoogleDriveIntegration = ({ onFileSelect, setFile, setDocumentMetadata }) 
                 }
             );
 
-            // Set metadata
             const newMetadata = {
                 title: metadata.name.replace(/\.[^/.]+$/, ''),
                 language: 'en',
@@ -294,16 +263,13 @@ const GoogleDriveIntegration = ({ onFileSelect, setFile, setDocumentMetadata }) 
                 format: fileExtension.toUpperCase()
             };
 
-            // Pass to parent component
             setFile(downloadedFile);
             setDocumentMetadata(newMetadata);
             onFileSelect(downloadedFile, newMetadata);
 
-            // Close file browser
             setShowFileBrowser(false);
 
         } catch (err) {
-            console.error('Error downloading file:', err);
             setError('Failed to download file from Google Drive');
         } finally {
             setIsLoading(false);

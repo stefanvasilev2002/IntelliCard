@@ -136,7 +136,8 @@ public class CardSetService {
                 cardSet.isPublic(),
                 cardSet.getCreator().getId(),
                 cardSet.getCreator().getUsername(),
-                accessType
+                accessType,
+                cardSet.getCards() == null ? 0 : cardSet.getCards().size()
         );
     }
 }

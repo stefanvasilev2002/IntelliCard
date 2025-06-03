@@ -83,10 +83,7 @@ export const accessRequestsAPI = {
 
 export const generateCardsAPI = {
     generateCards: (cardSetId, formData) => {
-        console.log('API: Making request to:', `/cards/${cardSetId}/generate-cards`);
-        console.log('API: FormData contents:');
         for (let [key, value] of formData.entries()) {
-            console.log(`  ${key}:`, value);
         }
 
         return api.post(`/cards/${cardSetId}/generate-cards`, formData);

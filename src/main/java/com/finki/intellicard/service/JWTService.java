@@ -41,7 +41,6 @@ public class JWTService {
             final String userName = extractUserName(token);
             return (userName.equals(userDetails.getUsername()) && !isTokenExpired(token));
         } catch (JwtException e) {
-            System.out.println("Invalid token: " + e.getMessage());
             return false;
         }
     }

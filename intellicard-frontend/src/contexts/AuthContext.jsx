@@ -28,7 +28,6 @@ export const AuthProvider = ({ children }) => {
                     setUser(userData);
                     setIsAuthenticated(true);
                 } catch (error) {
-                    console.error('Error parsing saved user:', error);
                     localStorage.removeItem('token');
                     localStorage.removeItem('user');
                 }

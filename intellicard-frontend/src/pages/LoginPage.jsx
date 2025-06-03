@@ -60,7 +60,6 @@ const LoginPage = () => {
                 toast.success('Welcome back!');
                 navigate('/dashboard');
             } else {
-                console.log("yoo")
                 toast.error(result.error || 'Invalid login credentials!');
             }
         } catch (error) {
