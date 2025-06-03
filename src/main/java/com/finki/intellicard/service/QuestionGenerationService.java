@@ -140,7 +140,7 @@ public class QuestionGenerationService {
         - Each flashcard should have a clear, specific term/question and comprehensive definition/answer
         - Focus on key concepts and important facts from the content
         - %s
-        - Keep definitions comprehensive but under 250 characters
+        - Must keep both terms and definitions comprehensive but under 250 characters
         - Terms should be specific and unambiguous
         - Questions should be directly based on the document content
         

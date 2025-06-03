@@ -9,20 +9,24 @@ import {
     Wand2,
     Settings,
     AlertCircle,
-    CheckCircle,
     Zap,
     Target,
-    Brain
+    Brain,
+    Cloud,
+    HardDrive
 } from 'lucide-react';
+import GoogleDriveIntegration from './GoogleDriveIntegration';
 import { generateCardsAPI } from '../services/api.js';
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
 const DocumentCardGenerator = ({ cardSetId, onCardsGenerated, onClose }) => {
     const [file, setFile] = useState(null);
+    const [documentMetadata, setDocumentMetadata] = useState(null);
     const [isGenerating, setIsGenerating] = useState(false);
     const [error, setError] = useState('');
     const [generationProgress, setGenerationProgress] = useState(0);
+    const [uploadMethod, setUploadMethod] = useState('local'); // 'local' or 'drive'
 
     const [settings, setSettings] = useState({
         questionCount: 10,
@@ -39,8 +43,8 @@ const DocumentCardGenerator = ({ cardSetId, onCardsGenerated, onClose }) => {
         }
 
         const fileExt = selectedFile.name.split('.').pop().toLowerCase();
-        if (!['pdf', 'txt'].includes(fileExt)) {
-            setError('Unsupported file format. Please upload PDF or TXT files.');
+        if (!['pdf', 'txt', 'docx'].includes(fileExt)) {
+            setError('Unsupported file format. Please upload PDF, DOCX, or TXT files.');
             return false;
         }
 
@@ -55,18 +59,45 @@ const DocumentCardGenerator = ({ cardSetId, onCardsGenerated, onClose }) => {
         }
 
         setFile(selectedFile);
+
+        // Create metadata for local files
+        const fileExt = selectedFile.name.split('.').pop().toLowerCase();
+        const metadata = {
+            title: selectedFile.name.replace(/\.[^/.]+$/, ''),
+            language: settings.language.toLowerCase(),
+            type: 'DOCUMENT',
+            format: fileExt.toUpperCase(),
+            source: 'local'
+        };
+        setDocumentMetadata(metadata);
         setError('');
-    }, []);
+    }, [settings.language]);
 
     const { getRootProps, getInputProps, isDragActive } = useDropzone({
         onDrop,
         accept: {
             'application/pdf': ['.pdf'],
-            'text/plain': ['.txt']
+            'text/plain': ['.txt'],
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx']
         },
         maxSize: MAX_FILE_SIZE,
         multiple: false
     });
+
+    const handleGoogleDriveFileSelect = (selectedFile, metadata) => {
+        if (validateFile(selectedFile)) {
+            setFile(selectedFile);
+
+            // Enhanced metadata from Google Drive
+            const enhancedMetadata = {
+                ...metadata,
+                source: 'google_drive',
+                language: settings.language.toLowerCase()
+            };
+            setDocumentMetadata(enhancedMetadata);
+            setError('');
+        }
+    };
 
     const generateCards = async () => {
         setIsGenerating(true);
@@ -84,14 +115,42 @@ const DocumentCardGenerator = ({ cardSetId, onCardsGenerated, onClose }) => {
             formData.append('difficultyLevel', settings.difficulty);
             formData.append('language', settings.language);
 
+            // Add metadata if available
+            if (documentMetadata) {
+                formData.append('documentTitle', documentMetadata.title);
+                formData.append('documentType', documentMetadata.type);
+                formData.append('documentFormat', documentMetadata.format);
+                formData.append('documentSource', documentMetadata.source);
+            }
+
             console.log('Sending request with:', {
                 cardSetId,
                 fileName: file.name,
                 fileSize: file.size,
+                fileType: file.type,
                 questionCount: settings.questionCount,
                 difficulty: settings.difficulty,
-                language: settings.language
+                language: settings.language,
+                uploadMethod,
+                documentMetadata,
+                hasFileProperties: !!(file && file.name && file.size),
+                fileConstructor: file.constructor.name
             });
+
+            // Debug FormData contents
+            console.log('FormData entries:');
+            for (let [key, value] of formData.entries()) {
+                if (value && typeof value === 'object' && value.name && value.size) {
+                    console.log(`  ${key}:`, {
+                        name: value.name,
+                        size: value.size,
+                        type: value.type,
+                        constructor: value.constructor.name
+                    });
+                } else {
+                    console.log(`  ${key}:`, value);
+                }
+            }
 
             const response = await generateCardsAPI.generateCards(cardSetId, formData);
 
@@ -138,8 +197,17 @@ const DocumentCardGenerator = ({ cardSetId, onCardsGenerated, onClose }) => {
 
     const removeFile = () => {
         setFile(null);
+        setDocumentMetadata(null);
         setError('');
         setGenerationProgress(0);
+    };
+
+    const switchUploadMethod = (method) => {
+        // Clear current file when switching methods
+        if (file) {
+            removeFile();
+        }
+        setUploadMethod(method);
     };
 
     const getDifficultyColor = (difficulty) => {
@@ -161,6 +229,22 @@ const DocumentCardGenerator = ({ cardSetId, onCardsGenerated, onClose }) => {
         };
         const Icon = icons[difficulty] || Zap;
         return <Icon size={16} />;
+    };
+
+    const getFileIcon = () => {
+        if (!file) return null;
+
+        const extension = file.name.split('.').pop().toLowerCase();
+        switch (extension) {
+            case 'pdf':
+                return <File className="w-8 h-8 text-red-500" />;
+            case 'docx':
+                return <FileText className="w-8 h-8 text-blue-600" />;
+            case 'txt':
+                return <FileText className="w-8 h-8 text-gray-500" />;
+            default:
+                return <File className="w-8 h-8 text-gray-500" />;
+        }
     };
 
     return (
@@ -193,50 +277,107 @@ const DocumentCardGenerator = ({ cardSetId, onCardsGenerated, onClose }) => {
                         </div>
                     )}
 
-                    {/* File Upload */}
-                    {!file ? (
-                        <div
-                            {...getRootProps()}
-                            className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
-                                isDragActive ? 'border-blue-500 bg-blue-50' : 'border-gray-300 hover:border-blue-500'
-                            } ${isGenerating ? 'pointer-events-none opacity-50' : ''}`}
-                        >
-                            <input {...getInputProps()} disabled={isGenerating} />
-                            <div className="flex flex-col items-center justify-center">
-                                <Upload className="w-12 h-12 text-gray-400 mb-4" />
-                                <p className="text-gray-600 mb-2">
-                                    {isDragActive
-                                        ? 'Drop the document here'
-                                        : 'Drag & drop your document here'}
-                                </p>
-                                <p className="text-gray-500 text-sm mb-4">
-                                    Supported formats: PDF, TXT (Max 10MB)
-                                </p>
+                    {/* Upload Method Selector */}
+                    {!file && (
+                        <div className="mb-6">
+                            <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg">
                                 <button
-                                    type="button"
-                                    className="btn-primary"
+                                    onClick={() => switchUploadMethod('local')}
+                                    className={`flex-1 flex items-center justify-center space-x-2 px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                                        uploadMethod === 'local'
+                                            ? 'bg-white text-gray-900 shadow-sm'
+                                            : 'text-gray-600 hover:text-gray-900'
+                                    }`}
                                     disabled={isGenerating}
-                                    onClick={(e) => e.stopPropagation()}
                                 >
-                                    Browse Files
+                                    <HardDrive size={16} />
+                                    <span>Local Upload</span>
+                                </button>
+                                <button
+                                    onClick={() => switchUploadMethod('drive')}
+                                    className={`flex-1 flex items-center justify-center space-x-2 px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                                        uploadMethod === 'drive'
+                                            ? 'bg-white text-gray-900 shadow-sm'
+                                            : 'text-gray-600 hover:text-gray-900'
+                                    }`}
+                                    disabled={isGenerating}
+                                >
+                                    <Cloud size={16} />
+                                    <span>Google Drive</span>
                                 </button>
                             </div>
                         </div>
+                    )}
+
+                    {/* File Upload */}
+                    {!file ? (
+                        uploadMethod === 'local' ? (
+                            <div
+                                {...getRootProps()}
+                                className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
+                                    isDragActive ? 'border-blue-500 bg-blue-50' : 'border-gray-300 hover:border-blue-500'
+                                } ${isGenerating ? 'pointer-events-none opacity-50' : ''}`}
+                            >
+                                <input {...getInputProps()} disabled={isGenerating} />
+                                <div className="flex flex-col items-center justify-center">
+                                    <Upload className="w-12 h-12 text-gray-400 mb-4" />
+                                    <p className="text-gray-600 mb-2">
+                                        {isDragActive
+                                            ? 'Drop the document here'
+                                            : 'Drag & drop your document here'}
+                                    </p>
+                                    <p className="text-gray-500 text-sm mb-4">
+                                        Supported formats: PDF, DOCX, TXT (Max 10MB)
+                                    </p>
+                                    <button
+                                        type="button"
+                                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                                        disabled={isGenerating}
+                                    >
+                                        Browse Files
+                                    </button>
+                                </div>
+                            </div>
+                        ) : (
+                            <GoogleDriveIntegration
+                                onFileSelect={handleGoogleDriveFileSelect}
+                                setFile={setFile}
+                                setDocumentMetadata={setDocumentMetadata}
+                            />
+                        )
                     ) : (
                         <div className="space-y-6">
                             {/* File Info */}
                             <div className="bg-gray-50 rounded-lg p-4 flex items-center justify-between">
                                 <div className="flex items-center space-x-3">
-                                    {file.name.endsWith('.pdf') ? (
-                                        <File className="w-8 h-8 text-red-500" />
-                                    ) : (
-                                        <FileText className="w-8 h-8 text-blue-500" />
-                                    )}
+                                    {getFileIcon()}
                                     <div>
                                         <p className="font-medium text-gray-900">{file.name}</p>
-                                        <p className="text-sm text-gray-500">
-                                            {(file.size / 1024 / 1024).toFixed(2)} MB
-                                        </p>
+                                        <div className="flex items-center space-x-2 text-sm text-gray-500">
+                                            <span>{(file.size / 1024 / 1024).toFixed(2)} MB</span>
+                                            {documentMetadata?.source === 'google_drive' && (
+                                                <>
+                                                    <span>•</span>
+                                                    <div className="flex items-center space-x-1">
+                                                        <Cloud size={12} />
+                                                        <span>Google Drive</span>
+                                                    </div>
+                                                </>
+                                            )}
+                                            {documentMetadata?.format && (
+                                                <>
+                                                    <span>•</span>
+                                                    <span className="uppercase font-medium">
+                                                        {documentMetadata.format}
+                                                    </span>
+                                                </>
+                                            )}
+                                        </div>
+                                        {documentMetadata?.title && documentMetadata.title !== file.name.replace(/\.[^/.]+$/, '') && (
+                                            <p className="text-xs text-gray-400 mt-1">
+                                                Title: {documentMetadata.title}
+                                            </p>
+                                        )}
                                     </div>
                                 </div>
                                 {!isGenerating && (
@@ -264,7 +405,7 @@ const DocumentCardGenerator = ({ cardSetId, onCardsGenerated, onClose }) => {
                                         <select
                                             value={settings.questionCount}
                                             onChange={(e) => setSettings({...settings, questionCount: parseInt(e.target.value)})}
-                                            className="input"
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                             disabled={isGenerating}
                                         >
                                             <option value={5}>5 cards</option>
@@ -282,7 +423,7 @@ const DocumentCardGenerator = ({ cardSetId, onCardsGenerated, onClose }) => {
                                         <select
                                             value={settings.difficulty}
                                             onChange={(e) => setSettings({...settings, difficulty: e.target.value})}
-                                            className="input"
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                             disabled={isGenerating}
                                         >
                                             <option value="EASY">Easy</option>
@@ -300,7 +441,7 @@ const DocumentCardGenerator = ({ cardSetId, onCardsGenerated, onClose }) => {
                                     <select
                                         value={settings.language}
                                         onChange={(e) => setSettings({...settings, language: e.target.value})}
-                                        className="input max-w-xs"
+                                        className="w-full max-w-xs px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                         disabled={isGenerating}
                                     >
                                         <option value="English">English</option>
@@ -346,18 +487,24 @@ const DocumentCardGenerator = ({ cardSetId, onCardsGenerated, onClose }) => {
                             <span className="text-sm text-gray-500">
                                 {settings.questionCount} cards
                             </span>
+                            {documentMetadata?.source === 'google_drive' && (
+                                <div className="flex items-center space-x-1 text-sm text-gray-500">
+                                    <Cloud size={12} />
+                                    <span>from Drive</span>
+                                </div>
+                            )}
                         </div>
                         <div className="flex items-center space-x-3">
                             <button
                                 onClick={onClose}
-                                className="btn-secondary"
+                                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
                                 disabled={isGenerating}
                             >
                                 Cancel
                             </button>
                             <button
                                 onClick={generateCards}
-                                className="btn-primary flex items-center space-x-2"
+                                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
                                 disabled={isGenerating || !file}
                             >
                                 {isGenerating ? (

@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { FiCloud, FiDownload, FiFile, FiFolder } from 'react-icons/fi';
 
-const API_KEY = process.env.REACT_APP_GOOGLE_API_KEY;
-const CLIENT_ID = process.env.REACT_APP_GOOGLE_CLIENT_ID;
+const API_KEY = import.meta.env?.VITE_GOOGLE_API_KEY || process.env?.REACT_APP_GOOGLE_API_KEY;
+const CLIENT_ID = import.meta.env?.VITE_GOOGLE_CLIENT_ID || process.env?.REACT_APP_GOOGLE_CLIENT_ID;
 const SCOPES = 'https://www.googleapis.com/auth/drive.readonly';
 
 const GoogleDriveIntegration = ({ onFileSelect, setFile, setDocumentMetadata }) => {
