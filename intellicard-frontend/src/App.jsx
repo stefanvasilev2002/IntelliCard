@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 
+import HomePage from './pages/HomePage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import DashboardPage from './pages/DashboardPage';
@@ -41,18 +42,21 @@ const ProtectedRoute = ({ children }) => {
 
 const PublicRoute = ({ children }) => {
     const { isAuthenticated, loading } = useAuth();
+    const location = useLocation();
 
     if (loading) {
         return <LoadingSpinner />;
     }
 
-    if (isAuthenticated) {
-        const location = useLocation();
-        const isPrivacyRoute = location.pathname === '/privacy';
+    if (isAuthenticated && location.pathname === '/privacy') {
+        return <PrivacyPage />;
+    }
 
-        if (isPrivacyRoute) {
-            return <PrivacyPage />;
-        }
+    if (isAuthenticated && location.pathname === '/') {
+        return <HomePage />;
+    }
+
+    if (isAuthenticated && (location.pathname === '/login' || location.pathname === '/register')) {
         return <Navigate to="/dashboard" replace />;
     }
 
@@ -63,6 +67,14 @@ const AppRoutes = () => {
     return (
         <Routes>
             {/* Public Routes */}
+            <Route
+                path="/"
+                element={
+                    <PublicRoute>
+                        <HomePage />
+                    </PublicRoute>
+                }
+            />
             <Route
                 path="/login"
                 element={
@@ -137,11 +149,8 @@ const AppRoutes = () => {
                 }
             />
 
-            {/* Default redirect */}
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
-
             {/* 404 Route */}
-            <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
     );
 };
