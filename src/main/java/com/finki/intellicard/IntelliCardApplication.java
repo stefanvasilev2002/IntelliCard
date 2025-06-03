@@ -1,6 +1,8 @@
 package com.finki.intellicard;
 
+/*
 import io.github.cdimascio.dotenv.Dotenv;
+*/
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
@@ -13,8 +15,8 @@ public class IntelliCardApplication {
         return new RestTemplate();
     }
     public static void main(String[] args) {
-        Dotenv dotenv = Dotenv.load();
-		System.setProperty("OPENAI_API_KEY", dotenv.get("OPENAI_API_KEY"));
+        /*Dotenv dotenv = Dotenv.load();
+		System.setProperty("OPENAI_API_KEY", dotenv.get("OPENAI_API_KEY"));*/
         SpringApplication.run(IntelliCardApplication.class, args);
     }
 
