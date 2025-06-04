@@ -1,7 +1,7 @@
 package com.finki.intellicard.config;
 
-
 import com.finki.intellicard.service.MyUserDetailsService;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -29,6 +29,9 @@ public class SecurityConfig {
     private final MyUserDetailsService userDetailsService;
     private final JwtFilter jwtFilter;
 
+    @Value("${spring.profiles.active:}")
+    private String activeProfile;
+
     public SecurityConfig(MyUserDetailsService userDetailsService, JwtFilter jwtFilter) {
         this.userDetailsService = userDetailsService;
         this.jwtFilter = jwtFilter;
@@ -36,16 +39,27 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-        return http
+        http
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(AbstractHttpConfigurer::disable)
-                .authorizeHttpRequests(request -> request
-                        .requestMatchers("/api/v1/auth/**").permitAll()
-                        .anyRequest().authenticated())
-                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .authenticationProvider(authenticationProvider())
-                .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
-                .build();
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
+
+        if ("desktop".equals(activeProfile)) {
+            http.authorizeHttpRequests(request -> request
+                            .requestMatchers("/api/v1/auth/**").permitAll()
+                            .anyRequest().permitAll()
+                    )
+                    .headers(headers -> headers.frameOptions().disable());
+        } else {
+            http.authorizeHttpRequests(request -> request
+                            .requestMatchers("/api/v1/auth/**").permitAll()
+                            .anyRequest().authenticated()
+                    )
+                    .authenticationProvider(authenticationProvider())
+                    .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
+        }
+
+        return http.build();
     }
 
     @Bean
@@ -70,11 +84,19 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
-        configuration.setAllowedOrigins(Arrays.asList(
-                "http://localhost:3000",
-                "http://localhost:5173",
-                "https://intellicard-frontend.onrender.com"
-        ));
+        if ("desktop".equals(activeProfile)) {
+            configuration.setAllowedOriginPatterns(List.of("*"));
+            configuration.setAllowedOrigins(Arrays.asList(
+                    "http://localhost:5173",
+                    "file://"
+            ));
+        } else {
+            configuration.setAllowedOrigins(Arrays.asList(
+                    "http://localhost:3000",
+                    "http://localhost:5173",
+                    "https://intellicard-frontend.onrender.com"
+            ));
+        }
 
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
         configuration.setAllowedHeaders(List.of("*"));
@@ -85,5 +107,4 @@ public class SecurityConfig {
         source.registerCorsConfiguration("/**", configuration);
         return source;
     }
-
 }

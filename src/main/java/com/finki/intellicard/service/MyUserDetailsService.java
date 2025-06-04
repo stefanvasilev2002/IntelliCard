@@ -1,6 +1,7 @@
 package com.finki.intellicard.service;
 
 import com.finki.intellicard.repository.UserRepository;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -12,6 +13,9 @@ import com.finki.intellicard.model.UserPrincipal;
 public class MyUserDetailsService implements UserDetailsService {
 
     private final UserRepository userRepository;
+
+    @Value("${spring.profiles.active:}")
+    private String activeProfile;
 
     public MyUserDetailsService(UserRepository userRepository) {
         this.userRepository = userRepository;
@@ -25,11 +29,32 @@ public class MyUserDetailsService implements UserDetailsService {
     }
 
     public String getUsername() {
-        UserDetails userDetails = (UserDetails) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-        return userDetails.getUsername();
+        if ("desktop".equals(activeProfile)) {
+            return getDesktopUsername();
+        }
+
+        try {
+            UserDetails userDetails = (UserDetails) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+            return userDetails.getUsername();
+        } catch (Exception e) {
+            return getDesktopUsername();
+        }
+    }
+
+    private String getDesktopUsername() {
+        return userRepository.findAll().stream()
+                .findFirst()
+                .map(user -> user.getUsername())
+                .orElse("defaultuser");
+
     }
 
     public Long getUserIdByUsername(String username) {
         return userRepository.getUserIdByUsername(username);
+    }
+
+    public Long getCurrentUserId() {
+        String username = getUsername();
+        return getUserIdByUsername(username);
     }
 }

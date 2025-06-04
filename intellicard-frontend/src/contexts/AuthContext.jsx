@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, useMemo } from 'react';
 import { authAPI } from '../services/api';
+import { isElectron, getStorageItem, setStorageItem, removeStorageItem } from '../utils/environment';
 import toast from 'react-hot-toast';
 
 const AuthContext = createContext({});
@@ -16,46 +17,84 @@ export const AuthProvider = ({ children }) => {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
     const [isAuthenticated, setIsAuthenticated] = useState(false);
+    const [isOnline, setIsOnline] = useState(navigator.onLine);
 
     useEffect(() => {
-        const initializeAuth = () => {
-            const token = localStorage.getItem('token');
-            const savedUser = localStorage.getItem('user');
+        const handleOnline = () => setIsOnline(true);
+        const handleOffline = () => setIsOnline(false);
 
-            if (token && savedUser) {
-                try {
-                    const userData = JSON.parse(savedUser);
+        window.addEventListener('online', handleOnline);
+        window.addEventListener('offline', handleOffline);
+
+        return () => {
+            window.removeEventListener('online', handleOnline);
+            window.removeEventListener('offline', handleOffline);
+        };
+    }, []);
+
+    useEffect(() => {
+        const initializeAuth = async () => {
+            try {
+                const token = await getStorageItem('token');
+                const savedUser = await getStorageItem('user');
+
+                if (token && savedUser) {
+                    const userData = typeof savedUser === 'string' ? JSON.parse(savedUser) : savedUser;
                     setUser(userData);
                     setIsAuthenticated(true);
-                } catch (error) {
-                    localStorage.removeItem('token');
-                    localStorage.removeItem('user');
                 }
+            } catch (error) {
+                console.error('Error initializing auth:', error);
+                await removeStorageItem('token');
+                await removeStorageItem('user');
+            } finally {
+                setLoading(false);
             }
-            setLoading(false);
         };
 
         initializeAuth();
     }, []);
 
-    const login = async (credentials) => {
+    const login = async (credentials, skipCloudSync = false) => {
         try {
             const response = await authAPI.login(credentials);
-            const token = response.data;
 
-            localStorage.setItem('token', token);
+            if (isElectron()) {
+                const userData = response.data;
 
-            const userData = {
-                username: credentials.username,
-            };
+                setStorageItem('token', 'local-token');
+                setStorageItem('user', userData);
+                setUser(userData);
+                setIsAuthenticated(true);
 
-            localStorage.setItem('user', JSON.stringify(userData));
-            setUser(userData);
-            setIsAuthenticated(true);
+                if (isOnline && !skipCloudSync) {
+                    try {
+                        await syncAPI.initialCloudSync(credentials);
+                        toast.success('Synced with cloud successfully');
+                    } catch (syncError) {
+                        console.warn('Cloud sync failed:', syncError);
+                        toast('Cloud sync failed, continuing offline', { icon: '⚠️' });
+                    }
+                }
 
-            return { success: true };
+                return { success: true };
+            } else {
+                const token = response.data;
+
+                setStorageItem('token', token);
+
+                const userData = {
+                    username: credentials.username,
+                };
+
+                setStorageItem('user', userData);
+                setUser(userData);
+                setIsAuthenticated(true);
+
+                return { success: true };
+            }
         } catch (error) {
-            const message = error.response?.data || 'Login failed';
+            const message = error.response?.data || error.message || 'Login failed';
             return { success: false, error: message };
         }
     };
@@ -63,18 +102,30 @@ export const AuthProvider = ({ children }) => {
     const register = async (userData) => {
         try {
             await authAPI.register(userData);
-            toast.success('Registration successful! Please log in.');
+
+            if (isElectron()) {
+                toast.success('Registration successful! You can now log in.');
+            } else {
+                toast.success('Registration successful! Please log in.');
+            }
+
             return { success: true };
         } catch (error) {
-            const message = error.response?.data || 'Registration failed';
+            const message = error.response?.data || error.message || 'Registration failed';
             toast.error(message);
             return { success: false, error: message };
         }
     };
 
-    const logout = () => {
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
+    const logout = async () => {
+        try {
+            await authAPI.logout();
+        } catch (error) {
+            console.warn('Logout error:', error);
+        }
+
+        removeStorageItem('token');
+        removeStorageItem('user');
         setUser(null);
         setIsAuthenticated(false);
         toast.success('Logged out successfully');
@@ -85,7 +136,62 @@ export const AuthProvider = ({ children }) => {
             const response = await authAPI.checkUsername(username);
             return response.data;
         } catch (error) {
+            if (isElectron()) {
+                return true;
+            }
             return false;
+        }
+    };
+
+    const syncToCloud = async () => {
+        if (!isElectron()) {
+            throw new Error('Sync only available in desktop mode');
+        }
+
+        if (!isOnline) {
+            toast.error('Internet connection required for sync');
+            return { success: false, error: 'No internet connection' };
+        }
+
+        try {
+            const result = await syncAPI.syncToCloud();
+            toast.success('Successfully synced to cloud');
+            return { success: true, data: result };
+        } catch (error) {
+            toast.error('Failed to sync to cloud');
+            return { success: false, error: error.message };
+        }
+    };
+
+    const syncFromCloud = async () => {
+        if (!isElectron()) {
+            throw new Error('Sync only available in desktop mode');
+        }
+
+        if (!isOnline) {
+            toast.error('Internet connection required for sync');
+            return { success: false, error: 'No internet connection' };
+        }
+
+        try {
+            const result = await syncAPI.syncFromCloud();
+            toast.success('Successfully synced from cloud');
+            return { success: true, data: result };
+        } catch (error) {
+            toast.error('Failed to sync from cloud');
+            return { success: false, error: error.message };
+        }
+    };
+
+    const getSyncStatus = async () => {
+        if (!isElectron()) {
+            return { synced: true, lastSync: null };
+        }
+
+        try {
+            return await syncAPI.getSyncStatus();
+        } catch (error) {
+            return { synced: false, lastSync: null, error: error.message };
         }
     };
 
@@ -93,11 +199,16 @@ export const AuthProvider = ({ children }) => {
         user,
         isAuthenticated,
         loading,
+        isOnline,
+        isDesktop: isElectron(),
         login,
         register,
         logout,
         checkUsername,
-    }), [user, isAuthenticated, loading]);
+        syncToCloud,
+        syncFromCloud,
+        getSyncStatus,
+    }), [user, isAuthenticated, loading, isOnline]);
 
     return (
         <AuthContext.Provider value={value}>

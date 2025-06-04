@@ -1,13 +1,21 @@
 import axios from 'axios';
+import { isElectron, getStorageItem, setStorageItem, removeStorageItem } from '../utils/environment';
 
-const API_BASE_URL = import.meta.env?.VITE_API_BASE_URL;
+const getApiBaseUrl = () => {
+    if (isElectron()) {
+        return 'http://localhost:8080/api/v1';
+    } else {
+        return import.meta.env.VITE_API_BASE_URL;
+    }
+};
 
 const api = axios.create({
-    baseURL: API_BASE_URL,
+    baseURL: getApiBaseUrl(),
+    timeout: 30000,
 });
 
 api.interceptors.request.use((config) => {
-    const token = localStorage.getItem('token');
+    const token = getStorageItem('token');
     if (token) {
         config.headers.Authorization = `Bearer ${token}`;
     }
@@ -18,8 +26,8 @@ api.interceptors.response.use(
     (response) => response,
     (error) => {
         if (error.response?.status === 401) {
-            localStorage.removeItem('token');
-            localStorage.removeItem('user');
+            removeStorageItem('token');
+            removeStorageItem('user');
             window.location.href = '/login';
         }
         return Promise.reject(error);
@@ -27,13 +35,30 @@ api.interceptors.response.use(
 );
 
 export const authAPI = {
-    login: (credentials) => api.post('/auth/login', credentials, {
-        headers: { 'Content-Type': 'application/json' }
-    }),
-    register: (userData) => api.post('/auth/register', userData, {
-        headers: { 'Content-Type': 'application/json' }
-    }),
-    checkUsername: (username) => api.get(`/auth/check-username?username=${username}`),
+    login: async (credentials) => {
+        const response = await api.post('/auth/login', credentials, {
+            headers: { 'Content-Type': 'application/json' }
+        });
+        return response;
+    },
+
+    register: async (userData) => {
+        const response = await api.post('/auth/register', userData, {
+            headers: { 'Content-Type': 'application/json' }
+        });
+        return response;
+    },
+
+    checkUsername: async (username) => {
+        const response = await api.get(`/auth/check-username?username=${username}`);
+        return response;
+    },
+
+    logout: async () => {
+        removeStorageItem('token');
+        removeStorageItem('user');
+        return { data: 'Logged out successfully' };
+    }
 };
 
 export const cardSetsAPI = {
@@ -69,23 +94,41 @@ export const studyAPI = {
 };
 
 export const accessRequestsAPI = {
-    request: (cardSetId) => api.post(`/cardsets/${cardSetId}/access-requests`, {}, {
-        headers: { 'Content-Type': 'application/json' }
-    }),
-    getPending: (cardSetId) => api.get(`/cardsets/${cardSetId}/access-requests`),
-    respond: (cardSetId, requestId, approve) =>
-        api.put(`/cardsets/${cardSetId}/access-requests/${requestId}?approve=${approve}`, {}, {
+    request: (cardSetId) => {
+        if (isElectron()) {
+            throw new Error('Access requests not supported in desktop mode');
+        }
+        return api.post(`/cardsets/${cardSetId}/access-requests`, {}, {
             headers: { 'Content-Type': 'application/json' }
-        }),
-    revoke: (cardSetId) =>
-        api.delete(`/cardsets/${cardSetId}/access-requests/revoke`),
+        });
+    },
+
+    getPending: (cardSetId) => {
+        if (isElectron()) {
+            return { data: [] };
+        }
+        return api.get(`/cardsets/${cardSetId}/access-requests`);
+    },
+
+    respond: (cardSetId, requestId, approve) => {
+        if (isElectron()) {
+            throw new Error('Access requests not supported in desktop mode');
+        }
+        return api.put(`/cardsets/${cardSetId}/access-requests/${requestId}?approve=${approve}`, {}, {
+            headers: { 'Content-Type': 'application/json' }
+        });
+    },
+
+    revoke: (cardSetId) => {
+        if (isElectron()) {
+            throw new Error('Access requests not supported in desktop mode');
+        }
+        return api.delete(`/cardsets/${cardSetId}/access-requests/revoke`);
+    },
 };
 
 export const generateCardsAPI = {
     generateCards: (cardSetId, formData) => {
-        for (let [key, value] of formData.entries()) {
-        }
-
         return api.post(`/cards/${cardSetId}/generate-cards`, formData);
     }
 };

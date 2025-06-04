@@ -120,20 +120,6 @@ const DocumentCardGenerator = ({ cardSetId, onCardsGenerated, onClose }) => {
                 formData.append('documentSource', documentMetadata.source);
             }
 
-            console.log('Sending request with:', {
-                cardSetId,
-                fileName: file.name,
-                fileSize: file.size,
-                fileType: file.type,
-                questionCount: settings.questionCount,
-                difficulty: settings.difficulty,
-                language: settings.language,
-                uploadMethod,
-                documentMetadata,
-                hasFileProperties: !!(file && file.name && file.size),
-                fileConstructor: file.constructor.name
-            });
-
             for (let [key, value] of formData.entries()) {
                 if (value && typeof value === 'object' && value.name && value.size) {
                     console.log(`  ${key}:`,
@@ -163,7 +149,6 @@ const DocumentCardGenerator = ({ cardSetId, onCardsGenerated, onClose }) => {
             onClose();
         } catch (err) {
             clearInterval(progressInterval);
-            console.error('Card generation error:', err);
 
             let errorMessage = 'Failed to generate cards. Please try again.';
 
