@@ -8,28 +8,23 @@ let springProcess;
 
 function startSpringBackend() {
     if (isDev) {
-        console.log('Development mode: Assuming Spring backend is running separately');
         return;
     }
 
     const jarPath = path.join(__dirname, '../backend/intellicard-backend.jar');
 
-    console.log('Starting Spring Boot backend...');
     springProcess = spawn('java', ['-jar', jarPath, '--spring.profiles.active=desktop'], {
         cwd: path.dirname(jarPath),
         stdio: 'pipe'
     });
 
     springProcess.stdout.on('data', (data) => {
-        console.log(`Spring Boot: ${data}`);
     });
 
     springProcess.stderr.on('data', (data) => {
-        console.error(`Spring Boot Error: ${data}`);
     });
 
     springProcess.on('close', (code) => {
-        console.log(`Spring Boot process exited with code ${code}`);
     });
 }
 

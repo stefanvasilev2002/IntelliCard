@@ -64,20 +64,22 @@ const DashboardLayout = ({ children }) => {
 
                         {/* Right side - Status and User Menu */}
                         <div className="flex items-center space-x-4">
-                            {/* Network Status */}
-                            <div className="flex items-center space-x-2 text-sm">
-                                {isOnline ? (
-                                    <div className="flex items-center space-x-1 text-green-600">
-                                        <Wifi size={14} />
-                                        <span className="hidden sm:inline">Online</span>
-                                    </div>
-                                ) : (
-                                    <div className="flex items-center space-x-1 text-red-600">
-                                        <WifiOff size={14} />
-                                        <span className="hidden sm:inline">Offline</span>
-                                    </div>
-                                )}
-                            </div>
+                            {/* Network Status - Desktop Only */}
+                            {isElectron() && (
+                                <div className="flex items-center space-x-2 text-sm">
+                                    {isOnline ? (
+                                        <div className="flex items-center space-x-1 text-green-600">
+                                            <Wifi size={14} />
+                                            <span className="hidden sm:inline">Online</span>
+                                        </div>
+                                    ) : (
+                                        <div className="flex items-center space-x-1 text-red-600">
+                                            <WifiOff size={14} />
+                                            <span className="hidden sm:inline">Offline</span>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
 
                             {/* Sync Status (Desktop only) */}
                             <SyncStatus />

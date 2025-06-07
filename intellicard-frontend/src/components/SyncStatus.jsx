@@ -1,21 +1,36 @@
 import React, { useState, useEffect } from 'react';
 import { Cloud, CloudOff, RefreshCw, CheckCircle, AlertCircle, WifiOff, Download, Upload } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { isElectron } from '../utils/environment';
+import { isElectron, getStorageItem } from '../utils/environment';
+import { syncService } from '../services/SyncService';
 import toast from 'react-hot-toast';
+import PasswordModal from './PasswordModal';
 
 const SyncStatus = ({ className = '' }) => {
-    const { isOnline, getSyncStatus, syncToCloud, syncFromCloud } = useAuth();
+    const { isOnline, getSyncStatus, syncToCloud, syncFromCloud, clearCloudAuth, resetSyncFlag } = useAuth();
     const [syncStatus, setSyncStatus] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
     const [showSyncModal, setShowSyncModal] = useState(false);
+    const [showPasswordModal, setShowPasswordModal] = useState(false);
+    const [passwordModalLoading, setPasswordModalLoading] = useState(false);
+    const [passwordPromiseResolve, setPasswordPromiseResolve] = useState(null);
 
     if (!isElectron()) {
         return null;
     }
 
     useEffect(() => {
+        resetSyncFlag();
         loadSyncStatus();
+
+        const passwordCallback = (username) => {
+            return new Promise((resolve) => {
+                setPasswordPromiseResolve(() => resolve);
+                setShowPasswordModal(true);
+            });
+        };
+
+        syncService.setPasswordCallback(passwordCallback);
 
         const interval = setInterval(loadSyncStatus, 30000);
         return () => clearInterval(interval);
@@ -26,7 +41,26 @@ const SyncStatus = ({ className = '' }) => {
             const status = await getSyncStatus();
             setSyncStatus(status);
         } catch (error) {
-            console.error('Failed to load sync status:', error);
+        }
+    };
+
+    const handleConnectToCloud = async () => {
+        if (!isOnline) {
+            toast.error('Internet connection required for sync');
+            return;
+        }
+
+        setIsLoading(true);
+        try {
+            const result = await syncToCloud();
+            if (result.success) {
+                await loadSyncStatus();
+                toast.success('Connected to cloud and synced successfully!');
+            }
+        } catch (error) {
+            toast.error(error.message || 'Failed to connect to cloud');
+        } finally {
+            setIsLoading(false);
         }
     };
 
@@ -44,7 +78,6 @@ const SyncStatus = ({ className = '' }) => {
                 setShowSyncModal(false);
             }
         } catch (error) {
-            console.error('Sync to cloud failed:', error);
         } finally {
             setIsLoading(false);
         }
@@ -64,10 +97,45 @@ const SyncStatus = ({ className = '' }) => {
                 setShowSyncModal(false);
             }
         } catch (error) {
-            console.error('Sync from cloud failed:', error);
         } finally {
             setIsLoading(false);
         }
+    };
+
+    const getCurrentUsername = () => {
+        const user = getStorageItem('user');
+        if (user) {
+            const userData = typeof user === 'string' ? JSON.parse(user) : user;
+            return userData.username || 'Unknown';
+        }
+        return 'Unknown';
+    };
+
+    const handlePasswordSubmit = (password) => {
+        setPasswordModalLoading(true);
+        if (passwordPromiseResolve) {
+            passwordPromiseResolve(password);
+            setPasswordPromiseResolve(null);
+        }
+        setShowPasswordModal(false);
+        setTimeout(() => setPasswordModalLoading(false), 100);
+    };
+
+    const handlePasswordCancel = () => {
+        if (passwordPromiseResolve) {
+            passwordPromiseResolve(null);
+            setPasswordPromiseResolve(null);
+        }
+        setShowPasswordModal(false);
+        setPasswordModalLoading(false);
+        setIsLoading(false);
+        resetSyncFlag();
+    };
+
+    const handleDisconnectFromCloud = () => {
+        clearCloudAuth();
+        loadSyncStatus();
+        toast.success('Disconnected from cloud');
     };
 
     const getSyncIcon = () => {
@@ -124,7 +192,6 @@ const SyncStatus = ({ className = '' }) => {
                 <span className={getSyncColor()}>{getSyncText()}</span>
             </button>
 
-            {/* Sync Modal */}
             {showSyncModal && (
                 <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
                     <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
@@ -133,7 +200,6 @@ const SyncStatus = ({ className = '' }) => {
                             <h3 className="text-lg font-medium text-gray-900">Cloud Sync</h3>
                         </div>
 
-                        {/* Sync Status */}
                         <div className="mb-6 space-y-3">
                             <div className="flex items-center justify-between text-sm">
                                 <span className="text-gray-600">Connection:</span>
@@ -194,42 +260,73 @@ const SyncStatus = ({ className = '' }) => {
                             )}
                         </div>
 
-                        {/* Sync Actions */}
                         <div className="space-y-3 mb-6">
-                            <button
-                                onClick={handleSyncToCloud}
-                                disabled={!isOnline || !syncStatus?.hasCloudToken || isLoading}
-                                className="w-full flex items-center justify-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                            >
-                                {isLoading ? (
-                                    <RefreshCw size={16} className="animate-spin" />
-                                ) : (
-                                    <Upload size={16} />
-                                )}
-                                <span>Sync to Cloud</span>
-                            </button>
+                            {!syncStatus?.hasCloudToken ? (
+                                <button
+                                    onClick={handleConnectToCloud}
+                                    disabled={!isOnline || isLoading}
+                                    className="w-full flex items-center justify-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                >
+                                    {isLoading ? (
+                                        <RefreshCw size={16} className="animate-spin" />
+                                    ) : (
+                                        <Cloud size={16} />
+                                    )}
+                                    <span>Connect to Cloud & Sync</span>
+                                </button>
+                            ) : (
+                                <>
+                                    <button
+                                        onClick={handleSyncToCloud}
+                                        disabled={!isOnline || isLoading}
+                                        className="w-full flex items-center justify-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                    >
+                                        {isLoading ? (
+                                            <RefreshCw size={16} className="animate-spin" />
+                                        ) : (
+                                            <Upload size={16} />
+                                        )}
+                                        <span>Sync to Cloud</span>
+                                    </button>
 
-                            <button
-                                onClick={handleSyncFromCloud}
-                                disabled={!isOnline || !syncStatus?.hasCloudToken || isLoading}
-                                className="w-full flex items-center justify-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                            >
-                                {isLoading ? (
-                                    <RefreshCw size={16} className="animate-spin" />
-                                ) : (
-                                    <Download size={16} />
-                                )}
-                                <span>Sync from Cloud</span>
-                            </button>
+                                    <button
+                                        onClick={handleSyncFromCloud}
+                                        disabled={!isOnline || isLoading}
+                                        className="w-full flex items-center justify-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                    >
+                                        {isLoading ? (
+                                            <RefreshCw size={16} className="animate-spin" />
+                                        ) : (
+                                            <Download size={16} />
+                                        )}
+                                        <span>Sync from Cloud</span>
+                                    </button>
+                                </>
+                            )}
                         </div>
 
-                        {/* Help Text */}
+                        {syncStatus?.hasCloudToken && (
+                            <div className="border-t pt-3 mb-4">
+                                <button
+                                    onClick={handleDisconnectFromCloud}
+                                    className="w-full text-sm text-red-600 hover:text-red-700 transition-colors"
+                                >
+                                    Disconnect from Cloud
+                                </button>
+                            </div>
+                        )}
+
                         <div className="text-xs text-gray-500 mb-4">
-                            <p className="mb-1">• Sync to Cloud: Upload your local changes to the cloud</p>
-                            <p>• Sync from Cloud: Download latest data from the cloud</p>
+                            {!syncStatus?.hasCloudToken ? (
+                                <p>• Connect to cloud to sync your data across devices</p>
+                            ) : (
+                                <>
+                                    <p className="mb-1">• Sync to Cloud: Upload your local changes to the cloud</p>
+                                    <p>• Sync from Cloud: Download latest data from the cloud</p>
+                                </>
+                            )}
                         </div>
 
-                        {/* Close Button */}
                         <div className="flex justify-end">
                             <button
                                 onClick={() => setShowSyncModal(false)}
@@ -242,6 +339,14 @@ const SyncStatus = ({ className = '' }) => {
                     </div>
                 </div>
             )}
+
+            <PasswordModal
+                isOpen={showPasswordModal}
+                onClose={handlePasswordCancel}
+                onSubmit={handlePasswordSubmit}
+                username={getCurrentUsername()}
+                isLoading={passwordModalLoading}
+            />
         </>
     );
 };

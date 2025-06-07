@@ -1,5 +1,10 @@
 export const isElectron = () => {
-    return typeof window !== 'undefined' && window.electronAPI;
+    const result = !!(window && window.process && window.process.type === 'renderer') ||
+        !!(window && window.require) ||
+        !!(window && window.__ELECTRON__) ||
+        (typeof navigator !== 'undefined' && navigator.userAgent.toLowerCase().includes('electron'));
+
+    return result;
 };
 
 export const isOnline = () => {

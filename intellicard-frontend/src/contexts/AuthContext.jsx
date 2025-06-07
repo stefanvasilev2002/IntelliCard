@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState, useMemo } from '
 import { authAPI } from '../services/api';
 import { isElectron, getStorageItem, setStorageItem, removeStorageItem } from '../utils/environment';
 import toast from 'react-hot-toast';
+import { syncService } from '../services/SyncService.js';
 
 const AuthContext = createContext({});
 
@@ -34,18 +35,36 @@ export const AuthProvider = ({ children }) => {
 
     useEffect(() => {
         const initializeAuth = async () => {
+
             try {
-                const token = await getStorageItem('token');
                 const savedUser = await getStorageItem('user');
 
-                if (token && savedUser) {
-                    const userData = typeof savedUser === 'string' ? JSON.parse(savedUser) : savedUser;
-                    setUser(userData);
-                    setIsAuthenticated(true);
+                if (isElectron()) {
+                    if (savedUser) {
+                        let userData;
+
+                        if (typeof savedUser === 'string' && savedUser.startsWith('eyJ')) {
+                            await removeStorageItem('user');
+                        } else {
+                            userData = typeof savedUser === 'string' ? JSON.parse(savedUser) : savedUser;
+                            setUser(userData);
+                            setIsAuthenticated(true);
+                        }
+                    } else {
+                    }
+                } else {
+                    const token = await getStorageItem('token');
+                    if (token && savedUser) {
+                        const userData = typeof savedUser === 'string' ? JSON.parse(savedUser) : savedUser;
+                        setUser(userData);
+                        setIsAuthenticated(true);
+                    } else {
+                    }
                 }
             } catch (error) {
-                console.error('Error initializing auth:', error);
-                await removeStorageItem('token');
+                if (!isElectron()) {
+                    await removeStorageItem('token');
+                }
                 await removeStorageItem('user');
             } finally {
                 setLoading(false);
@@ -60,22 +79,13 @@ export const AuthProvider = ({ children }) => {
             const response = await authAPI.login(credentials);
 
             if (isElectron()) {
-                const userData = response.data;
+                const userData = {
+                    username: credentials.username,
+                };
 
-                setStorageItem('token', 'local-token');
                 setStorageItem('user', userData);
                 setUser(userData);
                 setIsAuthenticated(true);
-
-                if (isOnline && !skipCloudSync) {
-                    try {
-                        await syncAPI.initialCloudSync(credentials);
-                        toast.success('Synced with cloud successfully');
-                    } catch (syncError) {
-                        console.warn('Cloud sync failed:', syncError);
-                        toast('Cloud sync failed, continuing offline', { icon: '⚠️' });
-                    }
-                }
 
                 return { success: true };
             } else {
@@ -119,12 +129,15 @@ export const AuthProvider = ({ children }) => {
 
     const logout = async () => {
         try {
-            await authAPI.logout();
+            if (!isElectron()) {
+                await authAPI.logout();
+            }
         } catch (error) {
-            console.warn('Logout error:', error);
         }
 
-        removeStorageItem('token');
+        if (!isElectron()) {
+            removeStorageItem('token');
+        }
         removeStorageItem('user');
         setUser(null);
         setIsAuthenticated(false);
@@ -143,56 +156,47 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
-    const syncToCloud = async () => {
+    const getSyncStatus = async () => {
         if (!isElectron()) {
-            throw new Error('Sync only available in desktop mode');
+            return null;
         }
 
-        if (!isOnline) {
-            toast.error('Internet connection required for sync');
-            return { success: false, error: 'No internet connection' };
-        }
+        const status = await syncService.getSyncStatus();
 
-        try {
-            const result = await syncAPI.syncToCloud();
-            toast.success('Successfully synced to cloud');
-            return { success: true, data: result };
-        } catch (error) {
-            toast.error('Failed to sync to cloud');
-            return { success: false, error: error.message };
+        const hasCloudToken = !!getStorageItem('cloudToken');
+
+        const finalStatus = {
+            ...status,
+            hasCloudToken
+        };
+
+        return finalStatus;
+    };
+
+    const clearCloudAuth = () => {
+        if (!isElectron()) return;
+        syncService.clearCloudAuth();
+    };
+
+    const syncToCloud = async () => {
+        if (!isElectron() || !isOnline) {
+            throw new Error('Sync not available');
         }
+        return await syncService.syncToCloud();
     };
 
     const syncFromCloud = async () => {
-        if (!isElectron()) {
-            throw new Error('Sync only available in desktop mode');
+        if (!isElectron() || !isOnline) {
+            throw new Error('Sync not available');
         }
-
-        if (!isOnline) {
-            toast.error('Internet connection required for sync');
-            return { success: false, error: 'No internet connection' };
-        }
-
-        try {
-            const result = await syncAPI.syncFromCloud();
-            toast.success('Successfully synced from cloud');
-            return { success: true, data: result };
-        } catch (error) {
-            toast.error('Failed to sync from cloud');
-            return { success: false, error: error.message };
-        }
+        return await syncService.syncFromCloud();
     };
 
-    const getSyncStatus = async () => {
+    const clearLocalData = async () => {
         if (!isElectron()) {
-            return { synced: true, lastSync: null };
+            throw new Error('Clear local data only available in desktop');
         }
-
-        try {
-            return await syncAPI.getSyncStatus();
-        } catch (error) {
-            return { synced: false, lastSync: null, error: error.message };
-        }
+        return await syncService.clearLocalData();
     };
 
     const value = useMemo(() => ({
@@ -208,6 +212,9 @@ export const AuthProvider = ({ children }) => {
         syncToCloud,
         syncFromCloud,
         getSyncStatus,
+        clearLocalData,
+        clearCloudAuth,
+        resetSyncFlag: () => syncService.resetSyncFlag(),
     }), [user, isAuthenticated, loading, isOnline]);
 
     return (

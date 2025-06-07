@@ -15,9 +15,11 @@ const api = axios.create({
 });
 
 api.interceptors.request.use((config) => {
-    const token = getStorageItem('token');
-    if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
+    if (!isElectron()) {
+        const token = getStorageItem('token');
+        if (token) {
+            config.headers.Authorization = `Bearer ${token}`;
+        }
     }
     return config;
 });
@@ -25,7 +27,7 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
     (response) => response,
     (error) => {
-        if (error.response?.status === 401) {
+        if (!isElectron() && error.response?.status === 401) {
             removeStorageItem('token');
             removeStorageItem('user');
             window.location.href = '/login';

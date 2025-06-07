@@ -32,6 +32,7 @@ import DocumentCardGenerator from '../components/DocumentCardGenerator';
 import { cardSetsAPI, cardsAPI, studyAPI } from '../services/api';
 import toast from 'react-hot-toast';
 import EnhancedStudyOptions from "../components/EnhancedStudyOptions.jsx";
+import {isElectron} from "@/utils/environment.js";
 
 const CardSetPage = () => {
     const { id } = useParams();
@@ -375,13 +376,15 @@ const CardSetPage = () => {
                                     <Plus size={14} />
                                     <span>Add New Card</span>
                                 </Link>
-                                <button
-                                    onClick={() => setShowDocumentGenerator(true)}
-                                    className="flex items-center space-x-2 w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-50 transition-colors"
-                                >
-                                    <Wand2 size={14} />
-                                    <span>Generate from Document</span>
-                                </button>
+                                {!isElectron() && (
+                                    <button
+                                        onClick={() => setShowDocumentGenerator(true)}
+                                        className="flex items-center space-x-2 w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-50 transition-colors"
+                                    >
+                                        <Wand2 size={14} />
+                                        <span>Generate from Document</span>
+                                    </button>
+                                )}
                                 <Link
                                     to={`/cardset/${id}/edit`}
                                     className="flex items-center space-x-2 w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-50 rounded-b-lg transition-colors"
@@ -428,7 +431,7 @@ const CardSetPage = () => {
 
                 {/* Enhanced Quick Actions for Owners */}
                 {isOwner && (
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+                    <div className={`grid grid-cols-1 gap-4 mb-8 ${isElectron() ? 'md:grid-cols-2' : 'md:grid-cols-3'}`}>
                         <Link
                             to={`/cardset/${id}/add-card`}
                             className="card-hover flex items-center space-x-4 p-4 transition-all hover:shadow-lg hover:scale-105"
@@ -442,18 +445,21 @@ const CardSetPage = () => {
                             </div>
                         </Link>
 
-                        <button
-                            onClick={() => setShowDocumentGenerator(true)}
-                            className="card-hover flex items-center space-x-4 p-4 transition-all hover:shadow-lg hover:scale-105 text-left"
-                        >
-                            <div className="p-3 bg-purple-100 rounded-lg">
-                                <Wand2 className="w-6 h-6 text-purple-600" />
-                            </div>
-                            <div>
-                                <h3 className="font-semibold text-gray-900">Generate from Document</h3>
-                                <p className="text-sm text-gray-500">Upload PDF/TXT and create cards with AI</p>
-                            </div>
-                        </button>
+                        {/* Only show AI generation button in web version */}
+                        {!isElectron() && (
+                            <button
+                                onClick={() => setShowDocumentGenerator(true)}
+                                className="card-hover flex items-center space-x-4 p-4 transition-all hover:shadow-lg hover:scale-105 text-left"
+                            >
+                                <div className="p-3 bg-purple-100 rounded-lg">
+                                    <Wand2 className="w-6 h-6 text-purple-600" />
+                                </div>
+                                <div>
+                                    <h3 className="font-semibold text-gray-900">Generate from Document</h3>
+                                    <p className="text-sm text-gray-500">Upload PDF/TXT and create cards with AI</p>
+                                </div>
+                            </button>
+                        )}
 
                         <Link
                             to={`/cardset/${id}/edit`}
@@ -536,13 +542,15 @@ const CardSetPage = () => {
                                     <Link to={`/cardset/${id}/add-card`} className="btn-primary hover:shadow-lg transition-shadow mr-3">
                                         Add your first card
                                     </Link>
-                                    <button
-                                        onClick={() => setShowDocumentGenerator(true)}
-                                        className="btn-secondary hover:shadow-lg transition-shadow flex items-center space-x-2 mx-auto"
-                                    >
-                                        <Wand2 size={16} />
-                                        <span>Generate from document</span>
-                                    </button>
+                                    {!isElectron() && (
+                                        <button
+                                            onClick={() => setShowDocumentGenerator(true)}
+                                            className="btn-secondary hover:shadow-lg transition-shadow flex items-center space-x-2 mx-auto"
+                                        >
+                                            <Wand2 size={16} />
+                                            <span>Generate from document</span>
+                                        </button>
+                                    )}
                                 </div>
                             )}
                         </div>
@@ -836,7 +844,7 @@ const CardSetPage = () => {
                 )}
 
                 {/* Document Card Generator Modal */}
-                {showDocumentGenerator && (
+                {!isElectron() && showDocumentGenerator && (
                     <DocumentCardGenerator
                         cardSetId={id}
                         onCardsGenerated={handleCardsGenerated}
