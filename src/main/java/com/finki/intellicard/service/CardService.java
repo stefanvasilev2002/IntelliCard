@@ -144,7 +144,7 @@ public class CardService {
                 card.getDefinition(),
                 progress != null ? progress.getTimesReviewed() : 0,
                 progress != null ? progress.getTimesCorrect() : 0,
-                progress != null ? progress.getNextReviewDate() : LocalDateTime.now().plusDays(1),
+                progress != null ? progress.getNextReviewDate() : null,
                 progress != null ? progress.getStatus().toString() : "NEW"
         );
     }

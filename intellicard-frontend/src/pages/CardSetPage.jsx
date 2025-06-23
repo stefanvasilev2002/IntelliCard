@@ -24,7 +24,8 @@ import {
     ChevronLeft,
     ChevronRight,
     ChevronsLeft,
-    ChevronsRight
+    ChevronsRight,
+    Calendar
 } from 'lucide-react';
 import DashboardLayout from '../components/DashboardLayout';
 import LoadingSpinner from '../components/LoadingSpinner';
@@ -47,6 +48,8 @@ const CardSetPage = () => {
 
     const [currentPage, setCurrentPage] = useState(1);
     const [cardsPerPage, setCardsPerPage] = useState(10);
+    const [statusFilter, setStatusFilter] = useState('ALL');
+    const [reviewFilter, setReviewFilter] = useState('ALL');
 
     const { data: cardSet, isLoading: cardSetLoading, error: cardSetError } = useQuery({
         queryKey: ['cardSet', id],
@@ -105,10 +108,82 @@ const CardSetPage = () => {
         },
     });
 
-    const filteredCards = cards?.filter(card =>
-        card.term.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        card.definition.toLowerCase().includes(searchTerm.toLowerCase())
-    ) || [];
+    const formatNextReviewDate = (nextReviewDate) => {
+        if (!nextReviewDate){
+            return {
+                text: 'New',
+                color: 'text-blue-600',
+                bgColor: 'bg-blue-50',
+                borderColor: 'border-blue-200',
+                isOverdue: false
+            }
+        }
+        const reviewDate = new Date(nextReviewDate);
+        const now = new Date();
+        const diffTime = reviewDate - now;
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+        if (diffDays < 0) {
+            return {
+                text: 'Overdue',
+                color: 'text-red-600',
+                bgColor: 'bg-red-50',
+                borderColor: 'border-red-200',
+                isOverdue: true
+            };
+        } else if (diffDays === 0) {
+            return {
+                text: 'Due today',
+                color: 'text-orange-600',
+                bgColor: 'bg-orange-50',
+                borderColor: 'border-orange-200',
+                isDueToday: true
+            };
+        } else if (diffDays === 1) {
+            return {
+                text: 'Due tomorrow',
+                color: 'text-yellow-600',
+                bgColor: 'bg-yellow-50',
+                borderColor: 'border-yellow-200',
+                isDueSoon: true
+            };
+        } else if (diffDays <= 7) {
+            return {
+                text: `Due in ${diffDays} days`,
+                color: 'text-blue-600',
+                bgColor: 'bg-blue-50',
+                borderColor: 'border-blue-200',
+                isDueSoon: true
+            };
+        } else {
+            return {
+                text: reviewDate.toLocaleDateString(),
+                color: 'text-gray-600',
+                bgColor: 'bg-gray-50',
+                borderColor: 'border-gray-200',
+                isFuture: true
+            };
+        }
+    };
+
+    const filteredCards = cards?.filter(card => {
+        const matchesSearch = card.term.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            card.definition.toLowerCase().includes(searchTerm.toLowerCase());
+
+        const matchesStatus = statusFilter === 'ALL' ||
+            (statusFilter === 'NEW' && (!card.status || card.status === 'NEW')) ||
+            card.status === statusFilter;
+
+        const reviewInfo = formatNextReviewDate(card.nextReviewDate);
+        const matchesReview = reviewFilter === 'ALL' ||
+            (reviewFilter === 'OVERDUE' && reviewInfo?.isOverdue) ||
+            (reviewFilter === 'DUE_TODAY' && reviewInfo?.isDueToday) ||
+            (reviewFilter === 'DUE_SOON' && reviewInfo?.isDueSoon) ||
+            (reviewFilter === 'FUTURE' && reviewInfo?.isFuture) ||
+            (reviewFilter === 'NEW' && !card.nextReviewDate);
+
+        return matchesSearch && matchesStatus && matchesReview;
+    }) || [];
 
     const totalCards = filteredCards.length;
     const totalPages = Math.ceil(totalCards / cardsPerPage);
@@ -118,7 +193,7 @@ const CardSetPage = () => {
 
     React.useEffect(() => {
         setCurrentPage(1);
-    }, [searchTerm]);
+    }, [searchTerm, statusFilter, reviewFilter]);
 
     const goToPage = (page) => {
         setCurrentPage(Math.max(1, Math.min(page, totalPages)));
@@ -287,6 +362,7 @@ const CardSetPage = () => {
                 return 'border-blue-200 hover:border-blue-300 bg-gradient-to-br from-blue-50 to-indigo-50 shadow-lg shadow-blue-100/50';
         }
     };
+
     const getMasteryPercentage = () => {
         if (!studyOverview || studyOverview.totalCards === 0) return 0;
         return Math.round((studyOverview.masteredCards / studyOverview.totalCards) * 100);
@@ -304,6 +380,18 @@ const CardSetPage = () => {
         if (!text) return '';
         if (text.length <= maxLength) return text;
         return text.substring(0, maxLength).trim() + '...';
+    };
+
+    const getCardPriorityStyle = (card) => {
+        const reviewInfo = formatNextReviewDate(card.nextReviewDate);
+
+        if (reviewInfo?.isOverdue) {
+            return 'ring-2 ring-red-300 ring-opacity-50 border-red-300';
+        } else if (reviewInfo?.isDueToday) {
+            return 'ring-2 ring-orange-300 ring-opacity-50 border-orange-300';
+        }
+
+        return getCardBorderStyle(card.status);
     };
 
     if (cardSetLoading) return <LoadingSpinner />;
@@ -334,7 +422,6 @@ const CardSetPage = () => {
     return (
         <DashboardLayout>
             <div className="max-w-6xl mx-auto">
-                {/* Header */}
                 <div className="flex items-center space-x-4 mb-6">
                     <button
                         onClick={() => navigate('/dashboard')}
@@ -360,7 +447,6 @@ const CardSetPage = () => {
                         </div>
                     </div>
 
-                    {/* Management Actions for Owners */}
                     {isOwner && (
                         <div className="relative group">
                             <button className="btn-secondary flex items-center space-x-2 hover:bg-gray-100 hover:shadow-md transition-all">
@@ -397,7 +483,6 @@ const CardSetPage = () => {
                     )}
                 </div>
 
-                {/* PROMINENT STUDY SECTION - Clean and Accessible */}
                 <div className="mb-8">
                     <div className="bg-gradient-to-r from-blue-50 to-indigo-100 border border-blue-200 rounded-xl p-6 shadow-lg">
                         <div className="flex items-center justify-between mb-4">
@@ -418,7 +503,6 @@ const CardSetPage = () => {
                             )}
                         </div>
 
-                        {/* Enhanced Study Options Component */}
                         <EnhancedStudyOptions
                             cardSetId={id}
                             cards={cards}
@@ -429,7 +513,6 @@ const CardSetPage = () => {
                     </div>
                 </div>
 
-                {/* Enhanced Quick Actions for Owners */}
                 {isOwner && (
                     <div className={`grid grid-cols-1 gap-4 mb-8 ${isElectron() ? 'md:grid-cols-2' : 'md:grid-cols-3'}`}>
                         <Link
@@ -445,7 +528,6 @@ const CardSetPage = () => {
                             </div>
                         </Link>
 
-                        {/* Only show AI generation button in web version */}
                         {!isElectron() && (
                             <button
                                 onClick={() => setShowDocumentGenerator(true)}
@@ -476,11 +558,10 @@ const CardSetPage = () => {
                     </div>
                 )}
 
-                {/* Enhanced Cards Section with Pagination - keeping all your existing code */}
                 <div className="card">
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
                         <h2 className="text-xl font-semibold text-gray-900">All Cards</h2>
-                        <div className="flex items-center space-x-4 mt-4 sm:mt-0">
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-3 sm:space-y-0 sm:space-x-4 mt-4 sm:mt-0">
                             <div className="relative">
                                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
                                 <input
@@ -492,31 +573,113 @@ const CardSetPage = () => {
                                 />
                             </div>
 
-                            {/* Cards per page selector */}
-                            {totalCards > 0 && (
+                            <div className="flex items-center space-x-3">
                                 <div className="flex items-center space-x-2">
-                                    <label className="text-sm text-gray-600">Show:</label>
+                                    <label className="text-sm text-gray-600 whitespace-nowrap">Status:</label>
                                     <select
-                                        value={cardsPerPage}
-                                        onChange={(e) => handleCardsPerPageChange(Number(e.target.value))}
-                                        className="input py-1 px-2 text-sm w-20"
+                                        value={statusFilter}
+                                        onChange={(e) => setStatusFilter(e.target.value)}
+                                        className="input py-1 px-2 text-sm w-28"
                                     >
-                                        <option value={5}>5</option>
-                                        <option value={10}>10</option>
-                                        <option value={20}>20</option>
-                                        <option value={50}>50</option>
+                                        <option value="ALL">All</option>
+                                        <option value="NEW">New</option>
+                                        <option value="LEARNING">Learning</option>
+                                        <option value="REVIEW">Review</option>
+                                        <option value="MASTERED">Mastered</option>
                                     </select>
                                 </div>
-                            )}
+
+                                <div className="flex items-center space-x-2">
+                                    <label className="text-sm text-gray-600 whitespace-nowrap">Review:</label>
+                                    <select
+                                        value={reviewFilter}
+                                        onChange={(e) => setReviewFilter(e.target.value)}
+                                        className="input py-1 px-2 text-sm w-32"
+                                    >
+                                        <option value="ALL">All</option>
+                                        <option value="OVERDUE">Overdue</option>
+                                        <option value="DUE_TODAY">Due Today</option>
+                                        <option value="DUE_SOON">Due Soon</option>
+                                        <option value="FUTURE">Future</option>
+                                        <option value="NEW">Never Studied</option>
+                                    </select>
+                                </div>
+
+                                {totalCards > 0 && (
+                                    <div className="flex items-center space-x-2">
+                                        <label className="text-sm text-gray-600 whitespace-nowrap">Show:</label>
+                                        <select
+                                            value={cardsPerPage}
+                                            onChange={(e) => handleCardsPerPageChange(Number(e.target.value))}
+                                            className="input py-1 px-2 text-sm w-16"
+                                        >
+                                            <option value={5}>5</option>
+                                            <option value={10}>10</option>
+                                            <option value={20}>20</option>
+                                            <option value={50}>50</option>
+                                        </select>
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     </div>
 
-                    {/* Results summary */}
+                    {(statusFilter !== 'ALL' || reviewFilter !== 'ALL' || searchTerm) && (
+                        <div className="mb-4 flex flex-wrap items-center gap-2">
+                            <span className="text-sm text-gray-600">Active filters:</span>
+                            {searchTerm && (
+                                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200">
+                                    Search: "{searchTerm}"
+                                    <button
+                                        onClick={() => setSearchTerm('')}
+                                        className="ml-1 text-blue-600 hover:text-blue-800"
+                                    >
+                                        ×
+                                    </button>
+                                </span>
+                            )}
+                            {statusFilter !== 'ALL' && (
+                                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 border border-green-200">
+                                    Status: {statusFilter}
+                                    <button
+                                        onClick={() => setStatusFilter('ALL')}
+                                        className="ml-1 text-green-600 hover:text-green-800"
+                                    >
+                                        ×
+                                    </button>
+                                </span>
+                            )}
+                            {reviewFilter !== 'ALL' && (
+                                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800 border border-purple-200">
+                                    Review: {reviewFilter.replace('_', ' ').toLowerCase()}
+                                    <button
+                                        onClick={() => setReviewFilter('ALL')}
+                                        className="ml-1 text-purple-600 hover:text-purple-800"
+                                    >
+                                        ×
+                                    </button>
+                                </span>
+                            )}
+                            <button
+                                onClick={() => {
+                                    setSearchTerm('');
+                                    setStatusFilter('ALL');
+                                    setReviewFilter('ALL');
+                                }}
+                                className="text-xs text-gray-500 hover:text-gray-700 underline"
+                            >
+                                Clear all filters
+                            </button>
+                        </div>
+                    )}
+
                     {totalCards > 0 && (
                         <div className="flex items-center justify-between mb-4 text-sm text-gray-600">
                             <div>
                                 Showing {startIndex + 1}-{Math.min(endIndex, totalCards)} of {totalCards} cards
-                                {searchTerm && ` matching "${searchTerm}"`}
+                                {(searchTerm || statusFilter !== 'ALL' || reviewFilter !== 'ALL') && cards &&
+                                    ` (filtered from ${cards.length} total)`
+                                }
                             </div>
                         </div>
                     )}
@@ -527,17 +690,20 @@ const CardSetPage = () => {
                         <div className="text-center py-12">
                             <BookOpen className="mx-auto h-12 w-12 text-gray-400" />
                             <h3 className="mt-2 text-sm font-medium text-gray-900">
-                                {searchTerm ? 'No cards match your search' : 'No cards yet'}
+                                {(searchTerm || statusFilter !== 'ALL' || reviewFilter !== 'ALL')
+                                    ? 'No cards match your filters'
+                                    : 'No cards yet'
+                                }
                             </h3>
                             <p className="mt-1 text-sm text-gray-500">
-                                {searchTerm
-                                    ? 'Try adjusting your search terms.'
+                                {(searchTerm || statusFilter !== 'ALL' || reviewFilter !== 'ALL')
+                                    ? 'Try adjusting your search terms or filters.'
                                     : isOwner
                                         ? 'Get started by adding your first card.'
                                         : 'This card set doesn\'t have any cards yet.'
                                 }
                             </p>
-                            {!searchTerm && isOwner && (
+                            {!(searchTerm || statusFilter !== 'ALL' || reviewFilter !== 'ALL') && isOwner && (
                                 <div className="mt-6 space-y-3">
                                     <Link to={`/cardset/${id}/add-card`} className="btn-primary hover:shadow-lg transition-shadow mr-3">
                                         Add your first card
@@ -556,123 +722,134 @@ const CardSetPage = () => {
                         </div>
                     ) : (
                         <>
-                            {/* Cards List */}
                             <div className="space-y-6">
-                                {currentCards.map((card, index) => (
-                                    <div key={card.id} className={`relative group rounded-xl p-6 transition-all duration-300 hover:shadow-xl hover:scale-[1.02] ${getCardBorderStyle(card.status)} overflow-hidden`}>
-                                        {/* Background gradient overlay */}
-                                        <div className="absolute inset-0 bg-gradient-to-br from-white via-white to-gray-50/50 rounded-xl"></div>
+                                {currentCards.map((card, index) => {
+                                    const reviewInfo = formatNextReviewDate(card.nextReviewDate);
 
-                                        {/* Status indicator stripe */}
-                                        <div className={`absolute left-0 top-0 bottom-0 w-1 ${
-                                            card.status === 'MASTERED' ? 'bg-gradient-to-b from-green-400 to-green-600' :
-                                                card.status === 'LEARNING' ? 'bg-gradient-to-b from-yellow-400 to-yellow-600' :
-                                                    card.status === 'REVIEW' ? 'bg-gradient-to-b from-orange-400 to-orange-600' :
-                                                        'bg-gradient-to-b from-blue-400 to-blue-600'
-                                        }`}></div>
+                                    return (
+                                        <div key={card.id} className={`relative group rounded-xl p-6 transition-all duration-300 hover:shadow-xl hover:scale-[1.02] ${getCardPriorityStyle(card)} overflow-hidden`}>
+                                            <div className="absolute inset-0 bg-gradient-to-br from-white via-white to-gray-50/50 rounded-xl"></div>
 
-                                        {/* Card number badge */}
-                                        <div className="absolute top-4 right-4 flex items-center space-x-2">
-                                            <div className="bg-gradient-to-r from-blue-500 to-purple-600 text-white text-xs font-bold px-2 py-1 rounded-full shadow-sm">
-                                                #{startIndex + index + 1}
-                                            </div>
-                                        </div>
+                                            <div className={`absolute left-0 top-0 bottom-0 w-1 ${
+                                                reviewInfo?.isOverdue ? 'bg-gradient-to-b from-red-400 to-red-600' :
+                                                    reviewInfo?.isDueToday ? 'bg-gradient-to-b from-orange-400 to-orange-600' :
+                                                        card.status === 'MASTERED' ? 'bg-gradient-to-b from-green-400 to-green-600' :
+                                                            card.status === 'LEARNING' ? 'bg-gradient-to-b from-yellow-400 to-yellow-600' :
+                                                                card.status === 'REVIEW' ? 'bg-gradient-to-b from-orange-400 to-orange-600' :
+                                                                    'bg-gradient-to-b from-blue-400 to-blue-600'
+                                            }`}></div>
 
-                                        <div className="relative z-10 flex items-start justify-between">
-                                            <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-6">
-                                                {/* Term Section */}
-                                                <div className="space-y-3">
-                                                    <div className="flex items-center space-x-2">
-                                                        <div className="p-2 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-lg shadow-sm">
-                                                            <BookOpen className="w-4 h-4 text-blue-600" />
-                                                        </div>
-                                                        <label className="text-sm font-semibold text-gray-800 uppercase tracking-wide">
-                                                            Term
-                                                        </label>
+                                            <div className="absolute top-4 right-4 flex items-center space-x-2">
+                                                {reviewInfo && (
+                                                    <div className={`flex items-center space-x-1 px-2 py-1 rounded-full text-xs font-medium ${reviewInfo.bgColor} ${reviewInfo.color} border ${reviewInfo.borderColor}`}>
+                                                        <Calendar size={12} />
+                                                        <span>{reviewInfo.text}</span>
                                                     </div>
-                                                    <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100 rounded-xl p-4 min-h-[80px] flex items-center shadow-inner">
-                                                        <p className="text-gray-900 font-medium text-lg leading-relaxed break-words"
-                                                           style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}
-                                                           title={card.term}>
-                                                            {truncateText(card.term, 150)}
-                                                        </p>
-                                                    </div>
-                                                </div>
-
-                                                {/* Definition Section */}
-                                                <div className="space-y-3">
-                                                    <div className="flex items-center space-x-2">
-                                                        <div className="p-2 bg-gradient-to-br from-emerald-100 to-teal-100 rounded-lg shadow-sm">
-                                                            <Target className="w-4 h-4 text-emerald-600" />
-                                                        </div>
-                                                        <label className="text-sm font-semibold text-gray-800 uppercase tracking-wide">
-                                                            Definition
-                                                        </label>
-                                                    </div>
-                                                    <div className="bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-100 rounded-xl p-4 min-h-[80px] flex items-center shadow-inner">
-                                                        <p className="text-gray-900 leading-relaxed break-words"
-                                                           style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}
-                                                           title={card.definition}>
-                                                            {truncateText(card.definition, 200)}
-                                                        </p>
-                                                    </div>
+                                                )}
+                                                <div className="bg-gradient-to-r from-blue-500 to-purple-600 text-white text-xs font-bold px-2 py-1 rounded-full shadow-sm">
+                                                    #{startIndex + index + 1}
                                                 </div>
                                             </div>
 
-                                            {/* Action buttons */}
-                                            {isOwner && (
-                                                <div className="ml-6 flex flex-col space-y-2 opacity-0 group-hover:opacity-100 transition-all duration-200">
-                                                    <button
-                                                        onClick={() => handleEditCard(card)}
-                                                        className="p-3 text-white bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 rounded-lg transition-all transform hover:scale-110 shadow-lg hover:shadow-xl"
-                                                        title="Edit card"
-                                                    >
-                                                        <Edit size={16} />
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleDeleteCard(card)}
-                                                        className="p-3 text-white bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 rounded-lg transition-all transform hover:scale-110 shadow-lg hover:shadow-xl"
-                                                        title="Delete card"
-                                                    >
-                                                        <Trash2 size={16} />
-                                                    </button>
-                                                </div>
-                                            )}
-                                        </div>
-
-                                        {/* Enhanced footer with stats and status */}
-                                        <div className="relative z-10 mt-6 pt-4 border-t border-gray-200/50">
-                                            <div className="flex items-center justify-between">
-                                                {/* Status badge */}
-                                                <div className={`flex items-center space-x-2 px-4 py-2 rounded-full text-sm font-medium shadow-sm ${getStatusStyle(card.status)} backdrop-blur-sm`}>
-                                                    {getStatusIcon(card.status)}
-                                                    <span>{card.status || 'NEW'}</span>
-                                                </div>
-
-                                                {/* Study stats */}
-                                                <div className="flex items-center space-x-4 text-sm">
-                                                    <div className="flex items-center space-x-1 text-gray-600">
-                                                        <Clock size={14} className="text-gray-400" />
-                                                        <span>Studied <span className="font-semibold text-gray-800">{card.timesReviewed || 0}</span> times</span>
-                                                    </div>
-                                                    {card.lastReviewed && (
-                                                        <div className="flex items-center space-x-1 text-gray-500 text-xs">
-                                                            <span>Last: {new Date(card.lastReviewed).toLocaleDateString()}</span>
+                                            <div className="relative z-10 flex items-start justify-between">
+                                                <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-6">
+                                                    <div className="space-y-3">
+                                                        <div className="flex items-center space-x-2">
+                                                            <div className="p-2 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-lg shadow-sm">
+                                                                <BookOpen className="w-4 h-4 text-blue-600" />
+                                                            </div>
+                                                            <label className="text-sm font-semibold text-gray-800 uppercase tracking-wide">
+                                                                Term
+                                                            </label>
                                                         </div>
-                                                    )}
+                                                        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100 rounded-xl p-4 min-h-[80px] flex items-center shadow-inner">
+                                                            <p className="text-gray-900 font-medium text-lg leading-relaxed break-words"
+                                                               style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}
+                                                               title={card.term}>
+                                                                {truncateText(card.term, 150)}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="space-y-3">
+                                                        <div className="flex items-center space-x-2">
+                                                            <div className="p-2 bg-gradient-to-br from-emerald-100 to-teal-100 rounded-lg shadow-sm">
+                                                                <Target className="w-4 h-4 text-emerald-600" />
+                                                            </div>
+                                                            <label className="text-sm font-semibold text-gray-800 uppercase tracking-wide">
+                                                                Definition
+                                                            </label>
+                                                        </div>
+                                                        <div className="bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-100 rounded-xl p-4 min-h-[80px] flex items-center shadow-inner">
+                                                            <p className="text-gray-900 leading-relaxed break-words"
+                                                               style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}
+                                                               title={card.definition}>
+                                                                {truncateText(card.definition, 200)}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                {isOwner && (
+                                                    <div className="ml-6 flex flex-col space-y-2 opacity-0 group-hover:opacity-100 transition-all duration-200">
+                                                        <button
+                                                            onClick={() => handleEditCard(card)}
+                                                            className="p-3 text-white bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 rounded-lg transition-all transform hover:scale-110 shadow-lg hover:shadow-xl"
+                                                            title="Edit card"
+                                                        >
+                                                            <Edit size={16} />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleDeleteCard(card)}
+                                                            className="p-3 text-white bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 rounded-lg transition-all transform hover:scale-110 shadow-lg hover:shadow-xl"
+                                                            title="Delete card"
+                                                        >
+                                                            <Trash2 size={16} />
+                                                        </button>
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            <div className="relative z-10 mt-6 pt-4 border-t border-gray-200/50">
+                                                <div className="flex items-center justify-between">
+                                                    <div className={`flex items-center space-x-2 px-4 py-2 rounded-full text-sm font-medium shadow-sm ${getStatusStyle(card.status)} backdrop-blur-sm`}>
+                                                        {getStatusIcon(card.status)}
+                                                        <span>{card.status || 'NEW'}</span>
+                                                    </div>
+
+                                                    <div className="flex items-center space-x-4 text-sm">
+                                                        <div className="flex items-center space-x-1 text-gray-600">
+                                                            <Clock size={14} className="text-gray-400" />
+                                                            <span>Studied <span className="font-semibold text-gray-800">{card.timesReviewed || 0}</span> times</span>
+                                                        </div>
+
+                                                        {card.timesCorrect !== undefined && card.timesReviewed > 0 && (
+                                                            <div className="flex items-center space-x-1 text-gray-600">
+                                                                <CheckCircle size={14} className="text-green-500" />
+                                                                <span>
+                                                                    <span className="font-semibold text-gray-800">{Math.round((card.timesCorrect / card.timesReviewed) * 100)}%</span> correct
+                                                                </span>
+                                                            </div>
+                                                        )}
+
+                                                        {reviewInfo && (
+                                                            <div className={`flex items-center space-x-1 ${reviewInfo.color}`}>
+                                                                <Calendar size={14} />
+                                                                <span className="font-medium">{reviewInfo.text}</span>
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             </div>
-                                        </div>
 
-                                        {/* Subtle pattern overlay for texture */}
-                                        <div className="absolute inset-0 opacity-5 rounded-xl" style={{
-                                            backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23000000' fill-opacity='0.1'%3E%3Ccircle cx='30' cy='30' r='2'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`
-                                        }}></div>
-                                    </div>
-                                ))}
+                                            <div className="absolute inset-0 opacity-5 rounded-xl" style={{
+                                                backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23000000' fill-opacity='0.1'%3E%3Ccircle cx='30' cy='30' r='2'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`
+                                            }}></div>
+                                        </div>
+                                    );
+                                })}
                             </div>
 
-                            {/* Pagination Controls */}
                             {totalPages > 1 && (
                                 <div className="flex items-center justify-between mt-8 pt-6 border-t border-gray-200">
                                     <div className="flex items-center space-x-2">
@@ -734,7 +911,6 @@ const CardSetPage = () => {
                     )}
                 </div>
 
-                {/* Enhanced Edit Card Modal */}
                 {showEditModal && (
                     <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
                         <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
@@ -810,7 +986,6 @@ const CardSetPage = () => {
                     </div>
                 )}
 
-                {/* Enhanced Delete Confirmation Modal */}
                 {showDeleteModal && (
                     <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
                         <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
@@ -843,7 +1018,6 @@ const CardSetPage = () => {
                     </div>
                 )}
 
-                {/* Document Card Generator Modal */}
                 {!isElectron() && showDocumentGenerator && (
                     <DocumentCardGenerator
                         cardSetId={id}

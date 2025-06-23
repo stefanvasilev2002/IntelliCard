@@ -39,6 +39,8 @@ const StudyPage = () => {
     const [studyConfig, setStudyConfig] = useState(null);
     const [studyCards, setStudyCards] = useState([]);
     const [originalCards, setOriginalCards] = useState([]);
+    const [originalStudyCards, setOriginalStudyCards] = useState([]);
+    const [isStudySessionActive, setIsStudySessionActive] = useState(false);
 
     const [currentCardIndex, setCurrentCardIndex] = useState(0);
     const [isFlipped, setIsFlipped] = useState(false);
@@ -88,43 +90,51 @@ const StudyPage = () => {
         if (allCards && allCards.length > 0) {
             setOriginalCards(allCards);
 
-            const storedConfig = sessionStorage.getItem('studyConfig');
-            if (storedConfig) {
-                try {
-                    const config = JSON.parse(storedConfig);
-                    setStudyConfig(config);
+            if (!isStudySessionActive) {
+                const storedConfig = sessionStorage.getItem('studyConfig');
+                if (storedConfig) {
+                    try {
+                        const config = JSON.parse(storedConfig);
+                        setStudyConfig(config);
 
-                    let cardsToStudy = config.cards || allCards;
+                        let cardsToStudy = config.cards || allCards;
 
-                    if (config.config?.shuffle) {
-                        cardsToStudy = shuffleArray([...cardsToStudy]);
+                        if (config.config?.shuffle) {
+                            cardsToStudy = shuffleArray([...cardsToStudy]);
+                        }
+
+                        setStudyCards(cardsToStudy);
+                        setOriginalStudyCards([...cardsToStudy]);
+                        setIsStudySessionActive(true);
+
+                        sessionStorage.removeItem('studyConfig');
+
+                        const modeLabels = {
+                            'smart': 'Smart Study (New & Due Cards)',
+                            'due-only': 'Due Cards Only',
+                            'new-only': 'New Cards Only',
+                            'mastered': 'Mastered Cards Review',
+                            'all': 'All Cards'
+                        };
+
+                        toast.success(`${modeLabels[config.studyType] || 'Study Mode'}: ${cardsToStudy.length} cards`, {
+                            icon: '📚',
+                            duration: 3000
+                        });
+
+                    } catch (error) {
+                        setStudyCards(allCards);
+                        setOriginalStudyCards([...allCards]);
+                        setIsStudySessionActive(true);
                     }
-
-                    setStudyCards(cardsToStudy);
-
-                    sessionStorage.removeItem('studyConfig');
-
-                    const modeLabels = {
-                        'smart': 'Smart Study (New & Due Cards)',
-                        'due-only': 'Due Cards Only',
-                        'new-only': 'New Cards Only',
-                        'mastered': 'Mastered Cards Review',
-                        'all': 'All Cards'
-                    };
-
-                    toast.success(`${modeLabels[config.studyType] || 'Study Mode'}: ${cardsToStudy.length} cards`, {
-                        icon: '📚',
-                        duration: 3000
-                    });
-
-                } catch (error) {
+                } else if (studyCards.length === 0) {
                     setStudyCards(allCards);
+                    setOriginalStudyCards([...allCards]);
+                    setIsStudySessionActive(true);
                 }
-            } else {
-                setStudyCards(allCards);
             }
         }
-    }, [allCards]);
+    }, [allCards, isStudySessionActive]);
 
     const shuffleArray = (array) => {
         const shuffled = [...array];
@@ -140,8 +150,6 @@ const StudyPage = () => {
             await studyAPI.reviewCard(cardId, correct, difficulty);
         },
         onSuccess: (_, variables) => {
-            queryClient.invalidateQueries(['studyCards', id]);
-            queryClient.invalidateQueries(['studyOverview', id]);
 
             const isCorrect = variables.correct;
             setStudyStats(prev => {
@@ -178,9 +186,16 @@ const StudyPage = () => {
             const response = await cardsAPI.update(cardId, cardData);
             return response.data;
         },
-        onSuccess: () => {
+        onSuccess: (updatedCard) => {
             toast.success('Card updated successfully');
-            refetch();
+
+            setStudyCards(prev => prev.map(card =>
+                card.id === updatedCard.id ? { ...card, ...updatedCard } : card
+            ));
+            setOriginalStudyCards(prev => prev.map(card =>
+                card.id === updatedCard.id ? { ...card, ...updatedCard } : card
+            ));
+
             setShowEditModal(false);
         },
         onError: () => {
@@ -282,14 +297,20 @@ const StudyPage = () => {
         });
         setCardHistory([]);
         setIsPaused(false);
+
+        if (originalStudyCards.length > 0) {
+            setStudyCards([...originalStudyCards]);
+        }
     };
 
     const switchToAllCards = () => {
         if (originalCards && originalCards.length > 0) {
             setStudyCards(originalCards);
+            setOriginalStudyCards([...originalCards]);
             setCurrentCardIndex(0);
             setIsFlipped(false);
             setStudyConfig(null);
+            setIsStudySessionActive(true);
             toast.success(`Switched to All Cards: ${originalCards.length} cards`, {
                 icon: '📚',
                 duration: 2000
@@ -321,7 +342,11 @@ const StudyPage = () => {
                         duration: 4000
                     });
 
-                    setTimeout(() => navigate(`/cardset/${id}`), 1500);
+                    setTimeout(() => {
+                        queryClient.invalidateQueries(['studyCards', id]);
+                        queryClient.invalidateQueries(['studyOverview', id]);
+                        navigate(`/cardset/${id}`);
+                    }, 1500);
                 }
             }, 300);
         }
@@ -471,7 +496,6 @@ const StudyPage = () => {
     return (
         <DashboardLayout>
             <div className="max-w-7xl mx-auto">
-                {/* Enhanced Header */}
                 <div className="flex items-center justify-between mb-6">
                     <div className="flex items-center space-x-4">
                         <button
@@ -506,7 +530,6 @@ const StudyPage = () => {
                     </div>
 
                     <div className="flex items-center space-x-3">
-                        {/* Switch to All Cards button if using filtered study mode */}
                         {studyConfig && originalCards && originalCards.length > studyCards.length && (
                             <button
                                 onClick={switchToAllCards}
@@ -587,8 +610,6 @@ const StudyPage = () => {
                     </div>
                 </div>
 
-                {/* Rest of your existing StudyPage JSX remains the same, just replace references to `cards` with `studyCards` */}
-                {/* Enhanced Progress & Stats */}
                 <div className={`grid gap-4 mb-6 ${showStats ? 'grid-cols-1 md:grid-cols-6' : 'grid-cols-1 md:grid-cols-4'}`}>
                     <div className="card hover:shadow-md transition-shadow">
                         <div className="flex items-center">
@@ -671,10 +692,6 @@ const StudyPage = () => {
                     )}
                 </div>
 
-                {/* Continue with rest of your existing JSX, making sure to use studyCards instead of cards */}
-                {/* ... */}
-
-                {/* Enhanced Progress Bar */}
                 <div className="mb-6">
                     <div className="flex justify-between text-sm text-gray-600 mb-2">
                         <span>Card {currentCardIndex + 1} of {studyCards?.length}</span>
@@ -700,7 +717,6 @@ const StudyPage = () => {
                     </div>
                 </div>
 
-                {/* Study Settings */}
                 <div className="card mb-6">
                     <div className="flex items-center justify-between">
                         <div className="text-center flex-1">
@@ -738,7 +754,6 @@ const StudyPage = () => {
                     </div>
                 </div>
 
-                {/* Enhanced Card Container */}
                 <div className="flex justify-center mb-8">
                     <div className="relative w-full max-w-2xl h-96">
                         <div
@@ -754,7 +769,6 @@ const StudyPage = () => {
                             }}
                         >
                             {!isFlipped ? (
-                                /* Front of card */
                                 <div className="absolute inset-0 w-full h-full bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-xl flex items-center justify-center p-6 border border-blue-300">
                                     <div className="text-center w-full h-full flex flex-col justify-center">
                                         <div className="mb-4">
@@ -776,7 +790,6 @@ const StudyPage = () => {
                                             {isPaused ? 'Study paused' : 'Click to see definition'}
                                         </p>
                                     </div>
-                                    {/* Auto-flip timer indicator */}
                                     {isAutoFlip && !isFlipped && !isPaused && (
                                         <div className="absolute bottom-2 right-2">
                                             <div className="w-3 h-3 bg-white bg-opacity-30 rounded-full animate-ping"></div>
@@ -784,7 +797,6 @@ const StudyPage = () => {
                                     )}
                                 </div>
                             ) : (
-                                /* Back of card */
                                 <div className="absolute inset-0 w-full h-full bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl shadow-xl flex items-center justify-center p-6 border border-orange-300">
                                     <div className="text-center w-full h-full flex flex-col justify-center">
                                         <div className="mb-4">
@@ -809,7 +821,6 @@ const StudyPage = () => {
                     </div>
                 </div>
 
-                {/* Enhanced Navigation */}
                 <div className="flex items-center justify-between mb-8">
                     <button
                         onClick={previousCard}
@@ -844,7 +855,6 @@ const StudyPage = () => {
                     </button>
                 </div>
 
-                {/* Enhanced Review Buttons (shown only when flipped) */}
                 {isFlipped && !isPaused && (
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3 max-w-4xl mx-auto mb-6">
                         {[1, 2, 3, 4].map((level) => {
@@ -869,7 +879,6 @@ const StudyPage = () => {
                     </div>
                 )}
 
-                {/* Pause Overlay */}
                 {isPaused && (
                     <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-40">
                         <div className="bg-white rounded-lg p-8 max-w-md w-full mx-4 text-center shadow-xl">
@@ -887,9 +896,7 @@ const StudyPage = () => {
                     </div>
                 )}
 
-                {/* Enhanced Card Status & History */}
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                    {/* Current Card Status */}
                     {currentCard?.status && (
                         <div className="flex items-center space-x-2 px-4 py-2 bg-gray-100 rounded-lg text-sm text-gray-600">
                             <span>Status: <span className="font-medium">{currentCard.status}</span></span>
@@ -899,7 +906,6 @@ const StudyPage = () => {
                         </div>
                     )}
 
-                    {/* Session Stats Summary */}
                     {studyStats.cardsStudied > 0 && (
                         <div className="flex items-center space-x-4 text-sm">
                             <div className="flex items-center space-x-2 px-3 py-1 bg-green-50 text-green-700 rounded-full">
@@ -920,7 +926,6 @@ const StudyPage = () => {
                     )}
                 </div>
 
-                {/* Motivational Messages */}
                 {studyStats.streak >= 10 && (
                     <div className="mt-6 card bg-gradient-to-r from-orange-50 to-red-50 border-orange-200">
                         <div className="flex items-center space-x-3">
@@ -953,7 +958,6 @@ const StudyPage = () => {
                     </div>
                 )}
 
-                {/* Enhanced Edit Card Modal */}
                 {showEditModal && (
                     <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
                         <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
